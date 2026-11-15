@@ -1,43 +1,45 @@
 # interactor-plan-lottie
 
-A Lottie animation of the poseswap plan, drawn like Unreal Engine Blueprints, and the script that draws it.
+A Lean 4 converter from planner JSON-LD to a Lottie animation drawn like Unreal Engine Blueprints, and the animation it makes for the poseswap plan.
 
-The animation has three scenes, 42.7 s in all (1680 x 720, 30 frames a second). A camera follows the node that is running, so only part of the graph shows at a time:
+JSON-LD in, Lottie out: the domain and one plan for each part go in, and one Lottie with a text version comes out (1680 x 720, 30 frames a second). One Sequence node runs a part for each plan, and a camera follows the node that is running, so only part of the graph shows at a time.
 
-- White pins and wires are the sequence: the order the planner runs the steps. An alternative is a Branch node.
-- Coloured pins are facts. A step's inputs are on its left (facts it reads) and its outputs on its right (facts it sets). A wire joins the step that sets a fact to the step that reads it. The red GPU pin is passed from one GPU step to the next, so GPU steps take turns.
-- A line at the foot of a node counts the facts the desk states and no step sets.
+- White pins and wires are the sequence: the order the planner runs the steps.
+- Coloured pins are facts. A step's inputs are on its left (facts it reads) and its outputs on its right (facts it sets).
+- A Branch node is a composite method with two or more alternatives. The way the plan took is lit, and the other is dim.
+- Every wire is solid. A dotted line is not a Blueprint thing.
 
-1. The presence slice: motion clips, packets, routing (the zone-router model or the relay), seal, judge, agree, play the curve, fit and follow the avatar, snapshot, then the OmniGen2 edit and the EditScore score.
-2. Inside the relay: the loop of `transport-zone-relay` that runs 64 times a second, taken from that repository's `docs/zone-net.md` and `docs/zone-relay.md`.
-3. The AUX route: from an image or a mesh to labelled, rigged garment parts, with the longest chain in red.
+## Nothing is drawn that the JSON-LD did not say
+
+The converter may hide what the JSON-LD says, but it may not add to it. A node is a plan step, titled from the action's key. Its pins are the facts it reads and sets, its time is its duration, and a caption is a variable's own description. The words that are the converter's own are "Sequence", "Then N", "not timed", "GPU" and a count of inputs the desk states.
+
+`plan_lottie_witness` checks this by planting marks: it renders from an empty domain, then from a domain in which every string carries a mark, and fails if any word on screen has neither.
 
 ## What is here
 
 | Path | What it holds |
 | --- | --- |
-| `poseswap-plan.lottie.json` | the animation |
-| `tools/make_poseswap_lottie.py` | the script that draws it |
-| `plans/aux-route-ready.plan.json` | the planner's plan that scene 3 is drawn from |
-| `viewer.html` | a page that plays the JSON |
+| `PlanLottie/`, `Main.lean` | the converter: `plan_lottie [--grid N] [--transcript out.md] <domain> <out.json> <plan>...` |
+| `Witness.lean` | 27 checks, golden, control, invariant and leak, each with a planted fault where it can fail |
+| `inputs/` | the poseswap domain and the planner's four plans: the presence slice, one relay tick, the AUX route and the obstacle course |
+| `poseswap-plan.lottie.json`, `poseswap-plan.transcript.md` | the animation, and the same graph as text |
+| `tests/golden/transcript.md` | the committed text version that the check compares against |
+| `viewer.html` | a page that plays it, with Pause, Restart, speed, a status line, and the text version below |
+| `make.sh` | build, draw, check |
 
 ## Rebuild it
 
-The domain is not copied here. It lives in `V-Sekai-fire/3d-character-poseswap`, and the animation was drawn from commit `d5a66b6` (branch `dev/image-route`), with the plan made by `persona_plan` from `interactor-taskweft-persona`.
+    ./make.sh
 
-    cd 3d-character-poseswap
-    bash tools/aux.sh plan /aux/rigged problems/aux-route-ready.jsonld     # writes out/plan.json
-    python3 ../interactor-plan-lottie/tools/make_poseswap_lottie.py domains/presence-edit.jsonld out/plan.json ../interactor-plan-lottie/poseswap-plan.lottie.json
+To redraw from a changed domain, plan again in `3d-character-poseswap` and copy the domain and the plans into `inputs/`. The domain lives there, so the copy can drift. Then run `make.sh`, and if the new text version is the one you mean, copy `poseswap-plan.transcript.md` over `tests/golden/transcript.md`.
 
-Scenes 1 and 3 are drawn from the domain, so a step added to it shows up on a redraw. Scene 2 is drawn by hand from the relay's docs, so it does not follow the domain.
-
-The planner runs independent steps side by side, and the white wire lists them one after another. Its sequence is the planner's step order, not a schedule.
+To play it, serve this folder (`python3 -m http.server`) and open `/viewer.html`. A `file://` page cannot fetch the JSON.
 
 ## What it does not have
 
-- Times for most of the presence slice. Only the model loads, the edit and the score have been timed, so the others say "not timed". Image-to-mesh and matting are not timed either, so the 91 minutes of scene 3 leaves them out.
-- A link from scene 1 to scene 3. The domain does not connect the edited image to the garment image, so no rail is drawn.
-- The relay numbers are the repository's own, measured at 256 people on Linux with two shared vCPUs, on loopback. They are not a real network.
+- The plans are for desks that state every input as on hand. Today's desk cannot reach the edit, and the obstacle course repository has no `project.godot`, so on today's desk the planner calls it unreachable.
+- Times for most steps. Only the model loads, the edit and the score are timed, so the rest say "not timed".
+- The relay's measured numbers and the tick rate. They are not in the domain, so they are not drawn.
 - A check in any player but lottie-web. The text is Arial, so a player without system fonts may letter it differently.
 
 ## Licence

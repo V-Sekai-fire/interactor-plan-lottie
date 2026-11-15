@@ -1,0 +1,2821 @@
+{
+ "@context": {
+  "VSEKAI": "https://v-sekai.org/",
+  "domain": "VSEKAI:planning/domain/"
+ },
+ "@type": "domain:Definition",
+ "name": "presence_edit",
+ "source": "3d-character-poseswap",
+ "version": "0.1.0",
+ "description": "A body is encoded to packets, routed, sealed and judged, optionally agreed by four replicas, played back on a curve, followed by the fitted ANNY avatar (interactor-anny-fit-guest fits it, interactor-anny-follow-guest poses it). The presence gates take a snapshot of that playback. OmniGen2 with the EditScore LoRA merged edits the snapshot, and EditScore scores the edit; both run in the interactor-omnigen2-guest ELF, written in Lean 4, of which the mul_mat op is built and checked. Each stage is a repository checked out beside the others. Variables are declared here and given their values by a problem. The AUX route then labels garment parts, measures whether each is rigid or soft from motion lag, and rigs them: relabel-coco: Map every source class of the Fashionpedia-class set into Skirt, Sleeve, Collar, Cape, Accessory, Fitted and Detail with a motion prior; drop nothing (repro/relabel_coco.py).; make-synth-set: Render GarmentCodeData drapes on the neutral body into a COCO set with exact part masks, split by garment (repro/gen_synth.py).; train-part-detector: Fine-tune RF-DETR-Seg-Small on the relabelled and the synthetic sets (repro/train_synth.py).; unitise-source: Normalise the source GLB into the unit cube before Segment; a centimetre source made the lookup distance 94 instead of 0.0007 (repro/common.py unitise_glb_inplace).; write-scale-sidecar: Write scale and offset beside every unit-cube mesh, with the metric size from a body-height prior; image-to-mesh models return unit-cube meshes only.; segment-labels: Run Alchemy3D-Segment with maps from the part detector; labels are anonymous clusters that need our own colour-to-class table.; build-warp: Build the NvidiaWarp-GarmentCode fork; fedora's gcc 16 is refused by CUDA 12.4 (gcc 13 is the limit), so a compatible host compiler is needed.; measure-motion-lag: Drape, move the body, and measure which vertices lag; a part that lags is soft, a part that follows is rigid. Clearance from the body is only a first signal.; make-hair-cards: HairDeck: portrait to hair cards on Apple MPS; needs SAM 3 and DINOv3 weights whose SHA-256 matches the pins.; make-spring-chains: HairDeck chain model: path, joints and stiffness per chain, in the normalised frame; apply the scale sidecar before fitting.; rig-aux-parts: Give soft parts spring-bone chains and rigid parts a parent bone, from the labels and the measured lag; SkinTokens rigs the body. Composite methods: /aux/labelled_parts (labels and scale sidecar), /aux/soft_rigid_known (labels and measured lag), /aux/rigged (labelled parts, the soft/rigid decision and the spring chains). Each AUX action states an ISO-8601 duration and a duration_basis (measured or estimate), so a plan's temporal total is a sum of those; the estimates are marked and should be replaced as runs are timed. The source is ingested into OpenUSD, which keeps its unit and up axis as stage metadata, and every other format is delivered from the stage: unitise-source makes the unit-cube GLB for Segment and its sidecar from the stage, and restore-units is its inverse. Parts are keyed by integer ids, never by names. No weld step: the weld was a workaround for the unit bug.",
+ "variables": [
+  {
+   "name": "part",
+   "type": "int",
+   "description": "1 when a repository of the presence slice, or a model repository, is checked out beside the others.",
+   "init": {}
+  },
+  {
+   "name": "input",
+   "type": "int",
+   "description": "1 when an input is on hand: a double-precision Godot editor, the packet golden file, the MuJoCo guest, the 100 Hz clips, the ANNY base mesh, the SOMA phenotype data, the built ANNY fit guest ELF, the OmniGen2 guest ELF built with only the mul_mat op, the full OmniGen2 guest ELF, a free GPU host, an edit prompt; for the AUX route: a Fashionpedia-class COCO set, the GarmentCodeData drapes, the Segment weights, SAM 3 and DINOv3 weights checked against their pinned SHA-256, a host C++ compiler the CUDA toolkit accepts, a body motion clip, a portrait.",
+   "init": {
+    "gpu": 0,
+    "garment_image": 0,
+    "birefnet_weights": 0,
+    "pixal3d_weights": 0
+   }
+  },
+  {
+   "name": "switch",
+   "type": "int",
+   "description": "1 when the optional replica stage is on.",
+   "init": {}
+  },
+  {
+   "name": "bypass",
+   "type": "int",
+   "description": "1 when the replica stage is off and passes the judged body through.",
+   "init": {}
+  },
+  {
+   "name": "model",
+   "type": "int",
+   "description": "1 when a model file is loaded.",
+   "init": {}
+  },
+  {
+   "name": "body",
+   "type": "int",
+   "description": "1 when the body has passed a stage of the presence slice.",
+   "init": {}
+  },
+  {
+   "name": "avatar",
+   "type": "int",
+   "description": "1 when the avatar is fitted or posed.",
+   "init": {}
+  },
+  {
+   "name": "op",
+   "type": "int",
+   "description": "1 when an op of the OmniGen2 guest is checked against its fixture.",
+   "init": {}
+  },
+  {
+   "name": "image",
+   "type": "int",
+   "description": "1 when the image of a stage is produced.",
+   "init": {}
+  },
+  {
+   "name": "aux",
+   "type": "int",
+   "description": "1 when a step of the AUX part-labelling and rigging route is done: coco_relabelled, synth_set, part_detector, unit_cube_source, part_labels, warp_built, motion_lag, hair_cards, spring_chains, scale_sidecar; composites labelled_parts, soft_rigid_known and rigged; also usd_stage (the source ingested into OpenUSD in its own units) and metric_labels (Segment's labels put back on the real-size stage by restore-units).",
+   "init": {}
+  },
+  {
+   "name": "course_input",
+   "type": "int",
+   "description": "1 when an input of the obstacle course (entities-obstacle-course) is on hand: the SOMA clips under motion/, the skintokens.elf and mm.elf build products, a skinned model, the course script, a Godot project, vmc.elf and a VMC sender.",
+   "init": {}
+  },
+  {
+   "name": "course",
+   "type": "int",
+   "description": "1 when a step of the obstacle course is done: clips_baked, clips_on_model, shapes_baked, colliders_checked, input_ready, clip_picked, posed, grounded, muscle_driven, avatar_follows, finished.",
+   "init": {}
+  },
+  {
+   "name": "relay_input",
+   "type": "int",
+   "description": "1 when an input of the zone relay (transport-zone-relay) is on hand: the socket for the first halves of frames, and the socket for the second halves.",
+   "init": {}
+  },
+  {
+   "name": "relay",
+   "type": "int",
+   "description": "1 when a step of one relay tick is done: datagrams, person, offered, handled, ticked, caught_up, next_tick.",
+   "init": {}
+  }
+ ],
+ "actions": {
+  "load-qwen25vl-conditioner": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/omnigen2",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/model/qwen25vl_conditioner",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT4S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:05Z",
+   "duration_basis": "measured: warm median 3.202 s of 4 runs, rounded up to whole seconds; slowest run 4.429 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured",
+   "measured": {
+    "runs_s": [
+     4.429,
+     3.346,
+     3.202,
+     3.202,
+     3.142
+    ],
+    "cold_s": 4.429,
+    "warm_median_s": 3.202,
+    "host": "fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)"
+   }
+  },
+  "load-omnigen2-transformer": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/omnigen2",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/model/omnigen2_transformer",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT4S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:17Z",
+   "duration_basis": "measured: warm median 3.26 s of 4 runs, rounded up to whole seconds; slowest run 11.408 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured",
+   "measured": {
+    "runs_s": [
+     11.408,
+     3.257,
+     3.327,
+     3.179,
+     3.262
+    ],
+    "cold_s": 11.408,
+    "warm_median_s": 3.26,
+    "host": "fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)"
+   }
+  },
+  "load-omnigen2-vae": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/omnigen2",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/model/omnigen2_vae",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:18Z",
+   "duration_basis": "measured: warm median 0.097 s of 4 runs, rounded up to whole seconds; slowest run 0.275 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured",
+   "measured": {
+    "runs_s": [
+     0.275,
+     0.096,
+     0.097,
+     0.097,
+     0.097
+    ],
+    "cold_s": 0.275,
+    "warm_median_s": 0.097,
+    "host": "fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)"
+   }
+  },
+  "load-editscore-lora": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/editscore",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/model/editscore_lora",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:01Z",
+   "duration_basis": "measured: warm median 0.006 s of 4 runs, rounded up to whole seconds; slowest run 0.053 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured",
+   "measured": {
+    "runs_s": [
+     0.053,
+     0.006,
+     0.006,
+     0.006,
+     0.006
+    ],
+    "cold_s": 0.053,
+    "warm_median_s": 0.006,
+    "host": "fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)"
+   }
+  },
+  "merge-editscore-lora": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/omnigen2_transformer",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/editscore_lora",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/model/editscore_merged",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:19Z",
+   "duration_basis": "measured: warm median 0.174 s of 4 runs, rounded up to whole seconds; slowest run 0.328 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured",
+   "measured": {
+    "runs_s": [
+     0.328,
+     0.172,
+     0.174,
+     0.174,
+     0.174
+    ],
+    "cold_s": 0.328,
+    "warm_median_s": 0.174,
+    "host": "fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)"
+   }
+  },
+  "fetch-clips": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/muscle_drive_release",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/input/clips",
+     "value": 1
+    }
+   ]
+  },
+  "encode-packets": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/packets",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/packet_golden",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/clips",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/packet",
+     "value": 1
+    }
+   ]
+  },
+  "route-model": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/zone_router",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/packet",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/routed",
+     "value": 1
+    }
+   ]
+  },
+  "route-relay": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/zone_relay",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/packet",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/routed",
+     "value": 1
+    }
+   ]
+  },
+  "seal-and-take": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/observer",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/routed",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/sealed",
+     "value": 1
+    }
+   ]
+  },
+  "judge": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/observer",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/sealed",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/judged",
+     "value": 1
+    }
+   ]
+  },
+  "agree": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/replica",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/switch/replica",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/judged",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/agreed",
+     "value": 1
+    }
+   ]
+  },
+  "skip-agree": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/bypass/replica",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/judged",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/agreed",
+     "value": 1
+    }
+   ]
+  },
+  "play-curve": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/curve",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/agreed",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/body/played",
+     "value": 1
+    }
+   ]
+  },
+  "check-mul-mat": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/omnigen2",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_mul_mat_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/op/mul_mat",
+     "value": 1
+    }
+   ]
+  },
+  "fit-anny": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/anny_fit",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/anny_fit_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/soma_pheno",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/avatar/fitted",
+     "value": 1
+    }
+   ]
+  },
+  "follow": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/anny_follow",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/avatar/fitted",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/mujoco_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/anny_glb",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/clips",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/body/played",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/avatar/posed",
+     "value": 1
+    }
+   ]
+  },
+  "snapshot": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/presence_gates",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/avatar/posed",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/image/snapshot",
+     "value": 1
+    }
+   ]
+  },
+  "edit": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/image/snapshot",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/edit_prompt",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/omnigen2",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/qwen25vl_conditioner",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/omnigen2_transformer",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/omnigen2_vae",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/model/editscore_merged",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/image/edited",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT1M7S",
+   "duration_basis": "measured once: 67.0 s for one 50-step BF16 edit at 672x1024 with the LoRA (baseline.log, fedora RTX 4090), rounded up; a single sample, so no range",
+   "measured": {
+    "runs_s": [
+     67.0
+    ],
+    "host": "fedora, RTX 4090 (baseline.log, one run)"
+   }
+  },
+  "score": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/part/editscore",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/omnigen2_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/image/edited",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/image/scored",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT22S",
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:01:49Z",
+   "duration_basis": "measured: median 21.450000000000003 s per edit over 6 edits (K=4 passes of the Qwen3-VL-8B judge), rounded up; slowest 22.6 s. Excludes the one-time 24.9 s judge load and smoke test, which no action models. end is the deadline when the loads, edit and score all take their slowest run",
+   "measured": {
+    "runs_s": [
+     20.8,
+     21.8,
+     19.4,
+     22.6,
+     21.1,
+     22.1
+    ],
+    "judge_load_and_smoke_s": 24.9,
+    "host": "fedora, RTX 4090, 6 edits of bf16-lora, tools/measure/time_score.sh, 2026-11-15"
+   }
+  },
+  "relabel-coco": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/coco_set",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/coco_relabelled",
+     "value": 1
+    }
+   ],
+   "duration": "PT10S",
+   "duration_basis": "estimate: a run of the script on fedora finished in seconds, not timed"
+  },
+  "make-synth-set": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gcd_drapes",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/synth_set",
+     "value": 1
+    }
+   ],
+   "duration": "PT8M32S",
+   "duration_basis": "measured: 360 garments on fedora, 2026-11-15"
+  },
+  "train-part-detector": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/coco_relabelled",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/synth_set",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/part_detector",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT19M24S",
+   "duration_basis": "measured: 15 epochs on the 3-class set, one RTX 4090"
+  },
+  "unitise-source": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/usd_stage",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/unit_cube_source",
+     "value": 1
+    }
+   ],
+   "duration": "PT2S",
+   "duration_basis": "estimate: one mesh; writes the sidecar from the stage's own unit"
+  },
+  "write-scale-sidecar": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/unit_cube_source",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/scale_sidecar",
+     "value": 1
+    }
+   ],
+   "duration": "PT2S",
+   "duration_basis": "estimate: checks the sidecar and the round trip; sidecar-from-height covers a mesh that has no unit"
+  },
+  "segment-labels": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/part_detector",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/unit_cube_source",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/segment_weights",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/part_labels",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT1M",
+   "duration_basis": "estimate: Segment alone took 6 to 12 s on the pony example; this adds the garment render and the maps"
+  },
+  "build-warp": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/host_cxx_ok",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/warp_built",
+     "value": 1
+    }
+   ],
+   "duration": "PT30M",
+   "duration_basis": "estimate: not built yet; blocked on the host compiler"
+  },
+  "measure-motion-lag": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/part_labels",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/warp_built",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/body_motion_clip",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gcd_drapes",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/motion_lag",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration": "PT1H",
+   "duration_basis": "estimate: not built yet"
+  },
+  "make-hair-cards": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/portrait",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/sam3_dinov3_verified",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/hair_cards",
+     "value": 1
+    }
+   ],
+   "duration": "PT1M28S",
+   "duration_basis": "measured: first portrait on the Mac (MPS), 18 to 40 s model load plus 35 s of compute"
+  },
+  "make-spring-chains": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/hair_cards",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/scale_sidecar",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/spring_chains",
+     "value": 1
+    }
+   ],
+   "duration": "PT2S",
+   "duration_basis": "measured: 1.3 s inside the same HairDeck run"
+  },
+  "rig-aux-parts": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/labelled_parts",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/soft_rigid_known",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/spring_chains",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/rigged",
+     "value": 1
+    }
+   ],
+   "duration": "PT1M",
+   "duration_basis": "estimate: not built yet"
+  },
+  "close-labelling": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/metric_labels",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/labelled_parts",
+     "value": 1
+    }
+   ],
+   "duration": "PT0S",
+   "duration_basis": "composite marker"
+  },
+  "classify-soft-rigid": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/labelled_parts",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/motion_lag",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/soft_rigid_known",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "duration_basis": "estimate"
+  },
+  "classify-by-class-prior": {
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/labelled_parts",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/soft_rigid_known",
+     "value": 1
+    },
+    {
+     "pointer/set": "/aux/soft_rigid_prior_only",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "duration_basis": "estimate: the table in tests/evidence/class_motion_counts.json decides soft, rigid or parent for each class whose motion covers 80% of its annotations (Skirt and Cape soft, Detail parent, Accessory and Fitted rigid) and leaves Collar and Sleeve as measure, which only the lag measurement settles. A lookup in a table of 7 classes; the script that once timed it at 0.02 s was removed, so no run backs the PT1S and the action has no code yet"
+  },
+  "ingest-usd": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/source_mesh",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/usd_stage",
+     "value": 1
+    }
+   ],
+   "duration": "PT5S",
+   "duration_basis": "estimate: one garment ingested in a few seconds on the Mac"
+  },
+  "restore-units": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/part_labels",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/scale_sidecar",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/metric_labels",
+     "value": 1
+    }
+   ],
+   "duration": "PT5S",
+   "duration_basis": "estimate: the inverse of unitise-source; refuses when the geometry does not confirm the pairing"
+  },
+  "use-dataset-mesh": {
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/source_mesh",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/source_mesh",
+     "value": 1
+    }
+   ],
+   "duration": "PT1S",
+   "duration_basis": "estimate: a bookkeeping step. It reads the mesh the desk states and does no work, so it takes the planner's smallest span, one second"
+  },
+  "matte-image": {
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/garment_image",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/birefnet_weights",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/matted_image",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: BiRefNet HR matting has run on poseswap portraits (HairDeck) but not as this step; no span is stated"
+  },
+  "pixal3d-image-to-mesh": {
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/aux/matted_image",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/pixal3d_weights",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu_host",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/aux/source_mesh",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: Pixal3D (multi-view checkpoints, on TRELLIS.2) has been fetched but never run on a garment image; no span is stated"
+  },
+  "bake-clips": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/soma_clips",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/clips_baked",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "rig-clips-on-model": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/clips_baked",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/skintokens_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/rigged_model",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/clips_on_model",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "bake-course": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/course_script",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/godot_double",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/shapes_baked",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "check-colliders": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/shapes_baked",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/colliders_checked",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "read-keyboard-or-pad": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/godot_project",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/input_ready",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "read-vmc-capture": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/godot_project",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/vmc_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/vmc_sender",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/input_ready",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "pick-clip": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/clips_baked",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/mm_elf",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/input_ready",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/clip_picked",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "play-clips": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/clips_on_model",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/clip_picked",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/godot_project",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/posed",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "hold-at-walls": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/colliders_checked",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/posed",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/mujoco_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/grounded",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "drive-muscles": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/grounded",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/mujoco_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/muscle_driven",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "follow-muscle-skeleton": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/muscle_driven",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course_input/rigged_model",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/avatar_follows",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "finish-course": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/course/avatar_follows",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/course/finished",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed: the repository is not a Godot project yet and none of it has run under Godot"
+  },
+  "drain-sockets": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay_input/socket_first_half",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay_input/socket_second_half",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/datagrams",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "identify-sender": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/datagrams",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/person",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "offer-frame": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/person",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/datagrams",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/offered",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "send-to-others": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/offered",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/handled",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "count-refused": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/person",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/handled",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "tick-zones": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/handled",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/ticked",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "catch-up-if-late": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/ticked",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/caught_up",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  },
+  "wait-for-next-tick": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/relay/caught_up",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/relay/next_tick",
+     "value": 1
+    }
+   ],
+   "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only"
+  }
+ },
+ "methods": {
+  "/model/qwen25vl_conditioner": {
+   "alternatives": [
+    {
+     "name": "load",
+     "subtasks": [
+      [
+       "load-qwen25vl-conditioner"
+      ]
+     ]
+    }
+   ]
+  },
+  "/model/omnigen2_transformer": {
+   "alternatives": [
+    {
+     "name": "load",
+     "subtasks": [
+      [
+       "load-omnigen2-transformer"
+      ]
+     ]
+    }
+   ]
+  },
+  "/model/omnigen2_vae": {
+   "alternatives": [
+    {
+     "name": "load",
+     "subtasks": [
+      [
+       "load-omnigen2-vae"
+      ]
+     ]
+    }
+   ]
+  },
+  "/model/editscore_lora": {
+   "alternatives": [
+    {
+     "name": "load",
+     "subtasks": [
+      [
+       "load-editscore-lora"
+      ]
+     ]
+    }
+   ]
+  },
+  "/model/editscore_merged": {
+   "alternatives": [
+    {
+     "name": "merge",
+     "subtasks": [
+      [
+       "goal",
+       "/model/omnigen2_transformer"
+      ],
+      [
+       "goal",
+       "/model/editscore_lora"
+      ],
+      [
+       "merge-editscore-lora"
+      ]
+     ]
+    }
+   ]
+  },
+  "/input/clips": {
+   "alternatives": [
+    {
+     "name": "fetch",
+     "subtasks": [
+      [
+       "fetch-clips"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/packet": {
+   "alternatives": [
+    {
+     "name": "encode",
+     "subtasks": [
+      [
+       "goal",
+       "/input/clips"
+      ],
+      [
+       "encode-packets"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/routed": {
+   "alternatives": [
+    {
+     "name": "model",
+     "subtasks": [
+      [
+       "goal",
+       "/body/packet"
+      ],
+      [
+       "route-model"
+      ]
+     ]
+    },
+    {
+     "name": "relay",
+     "subtasks": [
+      [
+       "goal",
+       "/body/packet"
+      ],
+      [
+       "route-relay"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/sealed": {
+   "alternatives": [
+    {
+     "name": "seal",
+     "subtasks": [
+      [
+       "goal",
+       "/body/routed"
+      ],
+      [
+       "seal-and-take"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/judged": {
+   "alternatives": [
+    {
+     "name": "judge",
+     "subtasks": [
+      [
+       "goal",
+       "/body/sealed"
+      ],
+      [
+       "judge"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/agreed": {
+   "alternatives": [
+    {
+     "name": "agree",
+     "subtasks": [
+      [
+       "goal",
+       "/body/judged"
+      ],
+      [
+       "agree"
+      ]
+     ]
+    },
+    {
+     "name": "passthrough",
+     "subtasks": [
+      [
+       "goal",
+       "/body/judged"
+      ],
+      [
+       "skip-agree"
+      ]
+     ]
+    }
+   ]
+  },
+  "/body/played": {
+   "alternatives": [
+    {
+     "name": "play",
+     "subtasks": [
+      [
+       "goal",
+       "/body/agreed"
+      ],
+      [
+       "play-curve"
+      ]
+     ]
+    }
+   ]
+  },
+  "/op/mul_mat": {
+   "alternatives": [
+    {
+     "name": "check",
+     "subtasks": [
+      [
+       "check-mul-mat"
+      ]
+     ]
+    }
+   ]
+  },
+  "/avatar/fitted": {
+   "alternatives": [
+    {
+     "name": "fit",
+     "subtasks": [
+      [
+       "fit-anny"
+      ]
+     ]
+    }
+   ]
+  },
+  "/avatar/posed": {
+   "alternatives": [
+    {
+     "name": "follow",
+     "subtasks": [
+      [
+       "goal",
+       "/body/played"
+      ],
+      [
+       "goal",
+       "/avatar/fitted"
+      ],
+      [
+       "follow"
+      ]
+     ]
+    }
+   ]
+  },
+  "/image/snapshot": {
+   "alternatives": [
+    {
+     "name": "snapshot",
+     "subtasks": [
+      [
+       "goal",
+       "/avatar/posed"
+      ],
+      [
+       "snapshot"
+      ]
+     ]
+    }
+   ]
+  },
+  "/image/edited": {
+   "alternatives": [
+    {
+     "name": "edit",
+     "subtasks": [
+      [
+       "goal",
+       "/image/snapshot"
+      ],
+      [
+       "goal",
+       "/model/qwen25vl_conditioner"
+      ],
+      [
+       "goal",
+       "/model/omnigen2_vae"
+      ],
+      [
+       "goal",
+       "/model/editscore_merged"
+      ],
+      [
+       "edit"
+      ]
+     ]
+    }
+   ]
+  },
+  "/image/scored": {
+   "alternatives": [
+    {
+     "name": "score",
+     "subtasks": [
+      [
+       "goal",
+       "/image/edited"
+      ],
+      [
+       "score"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/coco_relabelled": {
+   "alternatives": [
+    {
+     "name": "relabel-coco",
+     "subtasks": [
+      [
+       "relabel-coco"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/synth_set": {
+   "alternatives": [
+    {
+     "name": "make-synth-set",
+     "subtasks": [
+      [
+       "make-synth-set"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/part_detector": {
+   "alternatives": [
+    {
+     "name": "train-part-detector",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/coco_relabelled"
+      ],
+      [
+       "goal",
+       "/aux/synth_set"
+      ],
+      [
+       "train-part-detector"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/unit_cube_source": {
+   "alternatives": [
+    {
+     "name": "unitise",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/usd_stage"
+      ],
+      [
+       "unitise-source"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/scale_sidecar": {
+   "alternatives": [
+    {
+     "name": "sidecar",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/unit_cube_source"
+      ],
+      [
+       "write-scale-sidecar"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/part_labels": {
+   "alternatives": [
+    {
+     "name": "segment-labels",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/part_detector"
+      ],
+      [
+       "goal",
+       "/aux/unit_cube_source"
+      ],
+      [
+       "segment-labels"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/warp_built": {
+   "alternatives": [
+    {
+     "name": "build-warp",
+     "subtasks": [
+      [
+       "build-warp"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/motion_lag": {
+   "alternatives": [
+    {
+     "name": "measure-lag",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/part_labels"
+      ],
+      [
+       "goal",
+       "/aux/warp_built"
+      ],
+      [
+       "measure-motion-lag"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/hair_cards": {
+   "alternatives": [
+    {
+     "name": "make-hair-cards",
+     "subtasks": [
+      [
+       "make-hair-cards"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/spring_chains": {
+   "alternatives": [
+    {
+     "name": "make-spring-chains",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/hair_cards"
+      ],
+      [
+       "goal",
+       "/aux/scale_sidecar"
+      ],
+      [
+       "make-spring-chains"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/rigged": {
+   "alternatives": [
+    {
+     "name": "rig-parts",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/labelled_parts"
+      ],
+      [
+       "goal",
+       "/aux/soft_rigid_known"
+      ],
+      [
+       "goal",
+       "/aux/spring_chains"
+      ],
+      [
+       "rig-aux-parts"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/labelled_parts": {
+   "alternatives": [
+    {
+     "name": "label-parts",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/metric_labels"
+      ],
+      [
+       "close-labelling"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/soft_rigid_known": {
+   "alternatives": [
+    {
+     "name": "decide-soft-or-rigid",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/labelled_parts"
+      ],
+      [
+       "goal",
+       "/aux/motion_lag"
+      ],
+      [
+       "classify-soft-rigid"
+      ]
+     ]
+    },
+    {
+     "name": "decide-by-class-prior",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/labelled_parts"
+      ],
+      [
+       "classify-by-class-prior"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/usd_stage": {
+   "alternatives": [
+    {
+     "name": "ingest",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/source_mesh"
+      ],
+      [
+       "ingest-usd"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/metric_labels": {
+   "alternatives": [
+    {
+     "name": "restore",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/part_labels"
+      ],
+      [
+       "goal",
+       "/aux/scale_sidecar"
+      ],
+      [
+       "restore-units"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/source_mesh": {
+   "alternatives": [
+    {
+     "name": "dataset",
+     "subtasks": [
+      [
+       "use-dataset-mesh"
+      ]
+     ]
+    },
+    {
+     "name": "from-image",
+     "subtasks": [
+      [
+       "goal",
+       "/aux/matted_image"
+      ],
+      [
+       "pixal3d-image-to-mesh"
+      ]
+     ]
+    }
+   ]
+  },
+  "/aux/matted_image": {
+   "alternatives": [
+    {
+     "name": "matte",
+     "subtasks": [
+      [
+       "matte-image"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/clips_baked": {
+   "alternatives": [
+    {
+     "name": "bake",
+     "subtasks": [
+      [
+       "bake-clips"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/clips_on_model": {
+   "alternatives": [
+    {
+     "name": "rig",
+     "subtasks": [
+      [
+       "goal",
+       "/course/clips_baked"
+      ],
+      [
+       "rig-clips-on-model"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/shapes_baked": {
+   "alternatives": [
+    {
+     "name": "bake",
+     "subtasks": [
+      [
+       "bake-course"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/colliders_checked": {
+   "alternatives": [
+    {
+     "name": "check",
+     "subtasks": [
+      [
+       "goal",
+       "/course/shapes_baked"
+      ],
+      [
+       "check-colliders"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/input_ready": {
+   "alternatives": [
+    {
+     "name": "keyboard or pad",
+     "subtasks": [
+      [
+       "read-keyboard-or-pad"
+      ]
+     ]
+    },
+    {
+     "name": "VMC capture",
+     "subtasks": [
+      [
+       "read-vmc-capture"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/clip_picked": {
+   "alternatives": [
+    {
+     "name": "pick",
+     "subtasks": [
+      [
+       "goal",
+       "/course/clips_baked"
+      ],
+      [
+       "goal",
+       "/course/input_ready"
+      ],
+      [
+       "pick-clip"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/posed": {
+   "alternatives": [
+    {
+     "name": "play",
+     "subtasks": [
+      [
+       "goal",
+       "/course/clips_on_model"
+      ],
+      [
+       "goal",
+       "/course/clip_picked"
+      ],
+      [
+       "play-clips"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/grounded": {
+   "alternatives": [
+    {
+     "name": "hold",
+     "subtasks": [
+      [
+       "goal",
+       "/course/colliders_checked"
+      ],
+      [
+       "goal",
+       "/course/posed"
+      ],
+      [
+       "hold-at-walls"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/muscle_driven": {
+   "alternatives": [
+    {
+     "name": "drive",
+     "subtasks": [
+      [
+       "goal",
+       "/course/grounded"
+      ],
+      [
+       "drive-muscles"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/avatar_follows": {
+   "alternatives": [
+    {
+     "name": "follow",
+     "subtasks": [
+      [
+       "goal",
+       "/course/muscle_driven"
+      ],
+      [
+       "follow-muscle-skeleton"
+      ]
+     ]
+    }
+   ]
+  },
+  "/course/finished": {
+   "alternatives": [
+    {
+     "name": "finish",
+     "subtasks": [
+      [
+       "goal",
+       "/course/avatar_follows"
+      ],
+      [
+       "finish-course"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/datagrams": {
+   "alternatives": [
+    {
+     "name": "drain",
+     "subtasks": [
+      [
+       "drain-sockets"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/person": {
+   "alternatives": [
+    {
+     "name": "identify",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/datagrams"
+      ],
+      [
+       "identify-sender"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/offered": {
+   "alternatives": [
+    {
+     "name": "offer",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/person"
+      ],
+      [
+       "offer-frame"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/handled": {
+   "alternatives": [
+    {
+     "name": "forward",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/offered"
+      ],
+      [
+       "send-to-others"
+      ]
+     ]
+    },
+    {
+     "name": "refuse",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/person"
+      ],
+      [
+       "count-refused"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/ticked": {
+   "alternatives": [
+    {
+     "name": "tick",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/handled"
+      ],
+      [
+       "tick-zones"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/caught_up": {
+   "alternatives": [
+    {
+     "name": "catch up",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/ticked"
+      ],
+      [
+       "catch-up-if-late"
+      ]
+     ]
+    }
+   ]
+  },
+  "/relay/next_tick": {
+   "alternatives": [
+    {
+     "name": "wait",
+     "subtasks": [
+      [
+       "goal",
+       "/relay/caught_up"
+      ],
+      [
+       "wait-for-next-tick"
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "composed_from": [
+  "presence-body",
+  "presence-avatar",
+  "omnigen2-edit",
+  "aux-labels",
+  "aux-motion",
+  "aux-rig"
+ ]
+}
