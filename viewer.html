@@ -1,0 +1,8 @@
+<!doctype html>
+<meta charset="utf-8"><title>poseswap plan</title>
+<body style="margin:0;background:#fff"><div id="a" style="width:100vw;max-width:1680px"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js" integrity="sha384-J8C0MvgX4WP58J4N2W99vCKd2J6z99ynOJ5bEfE6jeP7kVTW1drYtv/jzrxM5jbm" crossorigin="anonymous"></script>
+<script>
+// Serve this folder (python3 -m http.server) and open /viewer.html. A file:// page cannot fetch the JSON.
+fetch("poseswap-plan.lottie.json").then(r => r.json()).then(d => lottie.loadAnimation({container: document.getElementById("a"), renderer: "svg", loop: true, autoplay: true, animationData: d}));
+</script>

@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: interactor-plan-lottie
+message: If you use this software, please cite it as below.
+type: software
+license: MIT
+authors:
+  - family-names: Lee
+    given-names: K. S. Ernest (iFire)
+    orcid: https://orcid.org/0000-0001-7772-8085
+repository-code: https://github.com/V-Sekai-fire/interactor-plan-lottie
+abstract: >-
+  A Lottie animation of the poseswap planning domain as a railroad diagram, and the script that draws it from the domain's own
+  reads and sets and from the planner's plan: the presence slice, the zone relay's loop, and the AUX route.
