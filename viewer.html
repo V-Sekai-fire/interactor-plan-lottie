@@ -1,8 +1,59 @@
 <!doctype html>
-<meta charset="utf-8"><title>poseswap plan</title>
-<body style="margin:0;background:#fff"><div id="a" style="width:100vw;max-width:1680px"></div>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A plan, drawn as Blueprints</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #121216; color: #f0f0f4; font: 16px/1.5 Arial, sans-serif; }
+  main { max-width: 1680px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  #stage { width: 100%; background: #000; border: 1px solid #555; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+  button, select { font: inherit; color: #fff; background: #2a3f6a; border: 2px solid #8fb0ff; border-radius: 6px; padding: 8px 16px; min-height: 44px; }
+  button:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible, pre:focus-visible { outline: 3px solid #ffd54a; outline-offset: 2px; }
+  a { color: #9cc2ff; }
+  #now { font-weight: bold; }
+  details { margin-top: 16px; } summary { cursor: pointer; }
+  pre { white-space: pre-wrap; background: #1b1b22; padding: 12px; border-radius: 6px; max-height: 60vh; overflow: auto; }
+</style>
+<main>
+  <h1 id="h">A plan, drawn as Blueprints</h1>
+  <p id="desc">An animation of one Sequence node that runs each part of a plan in turn. A text version follows below the player.</p>
+  <div id="stage" role="img" aria-labelledby="desc"></div>
+  <div class="bar" role="group" aria-label="Playback">
+    <button id="play" type="button" aria-pressed="false">Pause</button>
+    <button id="restart" type="button">Restart</button>
+    <label>Speed
+      <select id="speed"><option value="0.5">Half</option><option value="0.75">Slower</option><option value="1" selected>Normal</option></select>
+    </label>
+    <span id="now" role="status" aria-live="polite"></span>
+  </div>
+  <p>Motion can be stopped at any time with the Pause button. If your system asks for reduced motion, the animation starts paused. The same content is in the text version below and in <a href="poseswap-plan.transcript.md">poseswap-plan.transcript.md</a>.</p>
+  <details open><summary>Text version</summary><pre id="words" tabindex="0">Loading the text version. Serve this folder (python3 -m http.server) so the page can read it.</pre></details>
+</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js" integrity="sha384-J8C0MvgX4WP58J4N2W99vCKd2J6z99ynOJ5bEfE6jeP7kVTW1drYtv/jzrxM5jbm" crossorigin="anonymous"></script>
 <script>
-// Serve this folder (python3 -m http.server) and open /viewer.html. A file:// page cannot fetch the JSON.
-fetch("poseswap-plan.lottie.json").then(r => r.json()).then(d => lottie.loadAnimation({container: document.getElementById("a"), renderer: "svg", loop: true, autoplay: true, animationData: d}));
+// A file:// page cannot fetch the JSON: serve the folder (python3 -m http.server) and open /viewer.html.
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+fetch("poseswap-plan.transcript.md").then(r => r.text()).then(t => { $("words").textContent = t; });
+fetch("poseswap-plan.lottie.json").then(r => r.json()).then(data => {
+  if (data.nm) { $("h").textContent = data.nm; document.title = data.nm; }
+  const anim = lottie.loadAnimation({ container: $("stage"), renderer: "svg", loop: false, autoplay: !reduce, animationData: data });
+  const marks = data.markers.map(m => ({ t: m.tm, name: m.cm })).sort((a, b) => a.t - b.t);
+  let shown = "";
+  const setPlaying = on => { $("play").textContent = on ? "Pause" : "Play"; $("play").setAttribute("aria-pressed", on ? "false" : "true"); };
+  setPlaying(!reduce);
+  $("play").onclick = () => { if (anim.isPaused) { anim.play(); setPlaying(true); } else { anim.pause(); setPlaying(false); } };
+  $("restart").onclick = () => { anim.goToAndPlay(0, true); setPlaying(true); };
+  $("speed").onchange = e => anim.setSpeed(parseFloat(e.target.value));
+  anim.addEventListener("complete", () => setPlaying(false));
+  anim.addEventListener("enterFrame", e => {
+    const here = marks.filter(m => m.t <= e.currentTime).pop();
+    if (here && here.name !== shown) { shown = here.name; $("now").textContent = "Now showing: " + shown; }
+  });
+  if (reduce) { anim.goToAndStop(data.op - 2, true); $("now").textContent = "Paused on the last frame, because your system asks for reduced motion. Press Play to run it."; }
+});
 </script>
+</html>
