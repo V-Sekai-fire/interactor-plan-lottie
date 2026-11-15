@@ -1,240 +1,269 @@
 #!/usr/bin/env python3
-"""A Lottie railroad diagram of the whole poseswap domain, in two scenes: the presence slice through the OmniGen2 edit and score, then the AUX route.
-Rails are dependencies read from the domain itself (an action that sets a fact, and a later one that reads it), reduced to the shortest rails.
-usage: make_poseswap_lottie.py <poseswap domain.jsonld> <aux plan.json> <out.json>"""
-import json, sys, math, datetime as dt
+"""A Lottie of the poseswap plan drawn like Unreal Engine Blueprints: nodes with exec pins (white, the sequence) and data pins (coloured, inputs on the left, outputs on the right).
+Scenes 1 and 3 are read from the domain: a data pin is a fact a step reads or sets, a data wire joins the step that sets it to the one that reads it, and the white exec wire is the
+planner's step order (alternatives are Branch nodes). Scene 2 is the relay loop, drawn by hand from transport-zone-relay's docs.
+usage: make_poseswap_lottie.py <domain.jsonld> <aux plan.json> <out.json>"""
+import json, sys, math, re
 
 W, H, FR = 1680, 720, 30
-INK, MUTE, RAIL, BG = (0.13, 0.15, 0.2), (0.45, 0.48, 0.55), (0.80, 0.82, 0.86), (0.985, 0.98, 0.965)
-LANE = {"labels": (0.23, 0.51, 0.96), "motion": (0.96, 0.62, 0.04), "hair": (0.06, 0.73, 0.51), "rig": (0.55, 0.36, 0.96),
-        "body": (0.23, 0.51, 0.96), "avatar": (0.06, 0.73, 0.51), "edit": (0.55, 0.36, 0.96), "model": (0.96, 0.62, 0.04)}
-RED = (0.86, 0.15, 0.15)
-tint = lambda c: tuple(1 - 0.30 * (1 - x) for x in c)
+BGC, GRID1, GRID2 = (0.085, 0.085, 0.095), (0.115, 0.115, 0.125), (0.15, 0.15, 0.165)
+BODY, EDGE, TXT, SUB = (0.155, 0.155, 0.168), (0.04, 0.04, 0.045), (0.86, 0.86, 0.88), (0.62, 0.62, 0.66)
+WHITE, RED = (0.97, 0.97, 0.97), (0.9, 0.2, 0.2)
+HDR = {"labels": (0.12, 0.33, 0.62), "motion": (0.66, 0.38, 0.08), "hair": (0.13, 0.46, 0.27), "rig": (0.42, 0.24, 0.62), "body": (0.12, 0.33, 0.62), "avatar": (0.1, 0.46, 0.44),
+       "model": (0.66, 0.38, 0.08), "edit": (0.42, 0.24, 0.62), "event": (0.62, 0.1, 0.1), "branch": (0.32, 0.32, 0.36), "macro": (0.3, 0.3, 0.34)}
+PIN = {"body": (0.1, 0.8, 0.66), "avatar": (0.36, 0.66, 1.0), "image": (1.0, 0.46, 0.76), "model": (1.0, 0.8, 0.22), "aux": (0.46, 0.9, 0.4), "gpu": (0.9, 0.2, 0.2), "op": (0.8, 0.6, 1.0),
+       "input": (0.6, 0.6, 0.66), "struct": (0.0, 0.46, 0.95), "int": (0.1, 0.8, 0.66), "bool": (0.85, 0.15, 0.15)}
 dom = json.load(open(sys.argv[1])); aux_plan = json.load(open(sys.argv[2])); ACT = dom["actions"]
-reads = lambda a: {b["eval"]["pointer"] for b in ACT[a]["body"] if "eval" in b}
-sets = lambda a: {b["pointer/set"] for b in ACT[a]["body"] if "pointer/set" in b}
-GPU = {a for a in ACT if "/input/gpu" in reads(a)}
+reads = lambda a: [b["eval"]["pointer"] for b in ACT[a]["body"] if "eval" in b]
+sets = lambda a: [b["pointer/set"] for b in ACT[a]["body"] if "pointer/set" in b]
 def span(s): return f"{s} s" if s < 60 else f"{s // 60} min" + (f" {s % 60} s" if s % 60 else "")
 def secs(iso):
-    import re; m = re.match(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$", iso or ""); return None if not m else int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + int(m.group(3) or 0)
+    m = re.match(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$", iso or ""); return None if not m else int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + int(m.group(3) or 0)
 def timing(a):
     d = secs(ACT[a].get("duration"))
-    if d is None: return "not timed"
-    return span(d) + (" est." if ACT[a].get("duration_basis", "").startswith("estimate") else "")
+    return "not timed" if d is None else span(d) + (" est." if ACT[a].get("duration_basis", "").startswith("estimate") else "")
+def pin_type(f): return "gpu" if f == "/input/gpu" else f.split("/")[1]
+def label(f): return "GPU" if f == "/input/gpu" else f.split("/")[-1]
 
-class Scene:
-    def __init__(s, t0, t1): s.t0, s.t1, s.layers = t0, t1, []
-    def add(s, l): l.update({"ddd": 0, "ind": 0, "sr": 1, "ao": 0, "ip": s.t0, "op": s.t1, "st": 0, "bm": 0}); s.layers.append(l)
-    def lin(s, ts):
-        n = len(ts[0][1]); sh = lambda t: round(t + s.t0, 2)
-        return {"a": 1, "k": [{"t": sh(t), "s": v, "i": {"x": [1] * n, "y": [1] * n}, "o": {"x": [0] * n, "y": [0] * n}} for t, v in ts[:-1]] + [{"t": sh(ts[-1][0]), "s": ts[-1][1]}]}
-    def fade(s, f0, f1, out=None):
-        k = [(f0, [0]), (f1, [100])] + ([(out, [100]), (out + 8, [0])] if out else []); return s.lin(k)
 still = lambda v: {"a": 0, "k": v}
-def ks(p=(0, 0), o=None): return {"o": o or still(100), "r": still(0), "p": still([p[0], p[1], 0]), "a": still([0, 0, 0]), "s": still([100, 100, 100])}
 TR = {"ty": "tr", "p": still([0, 0]), "a": still([0, 0]), "s": still([100, 100]), "r": still(0), "o": still(100)}
-def rect(S, x, y, w, h, fill, name, r=10, stroke=None, sw=2.5, o=None):
+class Scene:
+    def __init__(s, t0): s.t0, s.t1, s.layers = t0, 0, []
+    def add(s, l): l.update({"ddd": 0, "ind": 0, "sr": 1, "ao": 0, "ip": s.t0, "op": 0, "st": 0, "bm": 0}); s.layers.append(l); return l
+    def lin(s, ts, ease=False):
+        n = len(ts[0][1]); sh = lambda t: round(t + s.t0, 2)
+        ox, oy, ix, iy = ([0.33] * n, [0] * n, [0.67] * n, [1] * n) if ease else ([0] * n, [0] * n, [1] * n, [1] * n)
+        return {"a": 1, "k": [{"t": sh(t), "s": v, "i": {"x": ix, "y": iy}, "o": {"x": ox, "y": oy}} for t, v in ts[:-1]] + [{"t": sh(ts[-1][0]), "s": ts[-1][1]}]}
+    def fade(s, f0, f1): return s.lin([(f0, [0]), (f1, [100])])
+def ks(p=(0, 0), o=None): return {"o": o or still(100), "r": still(0), "p": still([p[0], p[1], 0]), "a": still([0, 0, 0]), "s": still([100, 100, 100])}
+def grp(items, nm="g"): return {"ty": "gr", "nm": nm, "it": items + [TR]}
+def rc(x, y, w, h, fill, r=6, stroke=None, sw=1.2):
     it = [{"ty": "rc", "d": 1, "s": still([w, h]), "p": still([x + w / 2, y + h / 2]), "r": still(r)}]
     if fill: it.append({"ty": "fl", "c": still(list(fill) + [1]), "o": still(100), "r": 1})
     if stroke: it.append({"ty": "st", "c": still(list(stroke) + [1]), "o": still(100), "w": still(sw), "lc": 2, "lj": 2})
-    S.add({"ty": 4, "nm": name, "ks": ks(o=o), "shapes": [{"ty": "gr", "it": it + [TR], "nm": name}]})
+    return grp(it, "rect")
+def circle(x, y, r, color, filled):
+    it = [{"ty": "el", "s": still([2 * r, 2 * r]), "p": still([x, y])}, {"ty": "st", "c": still(list(color) + [1]), "o": still(100), "w": still(1.8), "lc": 2, "lj": 2}]
+    if filled: it.append({"ty": "fl", "c": still(list(color) + [1]), "o": still(100), "r": 1})
+    return grp(it, "pin")
+def execpin(x, y, filled):
+    pts = [[x - 5, y - 6], [x + 2, y - 6], [x + 7, y], [x + 2, y + 6], [x - 5, y + 6]]
+    it = [{"ty": "sh", "ks": still({"c": True, "v": pts, "i": [[0, 0]] * 5, "o": [[0, 0]] * 5})}, {"ty": "st", "c": still(list(WHITE) + [1]), "o": still(100), "w": still(1.8), "lc": 2, "lj": 2}]
+    if filled: it.append({"ty": "fl", "c": still(list(WHITE) + [1]), "o": still(100), "r": 1})
+    return grp(it, "exec")
+def bez(p1, p2):
+    d = max(50, abs(p2[0] - p1[0]) * 0.5); return {"c": False, "v": [list(p1), list(p2)], "i": [[0, 0], [-d, 0]], "o": [[d, 0], [0, 0]]}
+def wire(S, p1, p2, color, width, t0, t1, name, dash=False, base=None):
+    it = [{"ty": "sh", "ks": still(bez(p1, p2)), "nm": "path"}, {"ty": "tm", "s": still(0), "e": S.lin([(t0, [0]), (t1, [100])]), "o": still(0), "m": 1}]
+    st = {"ty": "st", "c": still(list(color) + [1]), "o": still(100), "w": still(width), "lc": 2, "lj": 2}
+    if dash: st["d"] = [{"n": "d", "nm": "dash", "v": still(8)}, {"n": "g", "nm": "gap", "v": still(6)}]
+    S.add({"ty": 4, "nm": name, "ks": ks(), "shapes": [grp(it + [st], name)]})
 def text(S, x, y, t, size, color, name, j=0, o=None):
     d = {"s": size, "f": "Arial", "t": t, "j": j, "tr": 0, "lh": size * 1.25, "ls": 0, "fc": list(color)}
     S.add({"ty": 5, "nm": name, "ks": ks(p=(x, y), o=o), "t": {"d": {"k": [{"s": d, "t": 0}]}, "p": {}, "m": {"g": 1, "a": still([0, 0])}, "a": []}})
-def rounded(pts, r=14):
-    v, i, o = [pts[0]], [[0, 0]], [[0, 0]]
-    for k in range(1, len(pts) - 1):
-        p, c, n = pts[k - 1], pts[k], pts[k + 1]; d1, d2 = math.dist(p, c), math.dist(c, n); rr = min(r, d1 / 2, d2 / 2)
-        a = [c[0] + (p[0] - c[0]) / d1 * rr, c[1] + (p[1] - c[1]) / d1 * rr]; b = [c[0] + (n[0] - c[0]) / d2 * rr, c[1] + (n[1] - c[1]) / d2 * rr]
-        v += [a, b]; i += [[0, 0], [(c[0] - b[0]) * 0.55, (c[1] - b[1]) * 0.55]]; o += [[(c[0] - a[0]) * 0.55, (c[1] - a[1]) * 0.55], [0, 0]]
-    v.append(pts[-1]); i.append([0, 0]); o.append([0, 0]); return {"c": False, "v": v, "i": i, "o": o}
-def rail(S, path, color, width, name, trim=None, o=None, dash=False):
-    it = [{"ty": "sh", "ks": still(path), "nm": "path"}]
-    if trim: it.append({"ty": "tm", "s": still(0), "e": S.lin([(trim[0], [0]), (trim[1], [100])]), "o": still(0), "m": 1})
-    st = {"ty": "st", "c": still(list(color) + [1]), "o": still(100), "w": still(width), "lc": 1, "lj": 2}
-    if dash: st["d"] = [{"n": "d", "nm": "dash", "v": still(9)}, {"n": "g", "nm": "gap", "v": still(7)}]
-    S.add({"ty": 4, "nm": name, "ks": ks(o=o), "shapes": [{"ty": "gr", "it": it + [st, TR], "nm": name}]})
 
-def reduce_edges(order, scope, lit_only=None):
-    E = {(u, v) for j, v in enumerate(order) for u in order[:j] if sets(u) & reads(v)}
-    def reach(u, v, skip):
-        stack, seen = [u], set()
-        while stack:
-            x = stack.pop()
-            for (a, b) in E:
-                if a == x and (a, b) != skip and b not in seen:
-                    if b == v: return True
-                    seen.add(b); stack.append(b)
-        return False
-    return sorted(e for e in E if not reach(e[0], e[1], e))
+NW, HH, ROW = 210, 28, 20
+class Node:
+    def __init__(n, S, key, x, y, title, sub, kind, ins, outs, exec_in=True, exec_outs=("",), desk=0, dim=False):
+        n.key, n.x, n.y, n.kind, n.dim = key, x, y, kind, dim; sh = 14 if sub else 0
+        n.head = HH + sh; rows = max(len(ins), len(outs), 0) + (1 if desk else 0)
+        n.h = n.head + 8 + max(len(exec_outs), 1) * 20 + rows * ROW + 8; n.ins, n.outs, n.exec_outs, n.exec_in = ins, outs, list(exec_outs), exec_in
+        n.pin_in, n.pin_out, n.xo = {}, {}, {}
+        n.title, n.sub, n.desk, n.S = title, sub, desk, S
+    def anchors(n):
+        y0 = n.y + n.head + 8 + max(len(n.exec_outs), 1) * 20
+        n.exec_in_pos = (n.x + 12, n.y + n.head + 18)
+        n.exec_out_pos = [(n.x + NW - 12, n.y + n.head + 18 + 20 * i) for i in range(len(n.exec_outs))]
+        for i, (k, t) in enumerate(n.ins): n.pin_in[k] = (n.x + 12, y0 + 10 + i * ROW)
+        for i, (k, t) in enumerate(n.outs): n.pin_out[k] = (n.x + NW - 12, y0 + 10 + i * ROW)
+    def draw(n, wired_in, wired_out, t_lit, exec_in_wired, exec_out_wired):
+        S, a = n.S, 1.0 if not n.dim else 0.55; n.anchors(); col = HDR[n.kind]
+        items = [rc(n.x, n.y, NW, n.h, BODY, 7, EDGE, 1.4), rc(n.x, n.y, NW, n.head, col, 7), rc(n.x, n.y + n.head - 8, NW, 8, col, 0)]
+        if n.exec_in is not False: items.append(execpin(*n.exec_in_pos, exec_in_wired))
+        for i, name in enumerate(n.exec_outs): items.append(execpin(*n.exec_out_pos[i], exec_out_wired[i]))
+        for (k, t) in n.ins: items.append(circle(*n.pin_in[k], 4.5, PIN[t], k in wired_in))
+        for (k, t) in n.outs: items.append(circle(*n.pin_out[k], 4.5, PIN[t], k in wired_out))
+        S.add({"ty": 4, "nm": f"node {n.key}", "ks": ks(o=S.lin([(8, [0]), (22, [100 * a])])), "shapes": items[::-1]})   # Lottie paints the first group on top
+        if t_lit is not None:                                        # the node runs: its outline and header flash
+            S.add({"ty": 4, "nm": f"flash {n.key}", "ks": ks(o=S.lin([(t_lit, [0]), (t_lit + 5, [100]), (t_lit + 30, [0])])), "shapes": [rc(n.x, n.y, NW, n.head, (1, 1, 1), 7), rc(n.x, n.y, NW, n.h, None, 7, WHITE, 2.6)]})
+            S.layers[-1]["shapes"][0]["it"][1]["o"] = still(18)
+        fo = S.fade(12, 26)
+        text(S, n.x + 10, n.y + 19, n.title, 14, (1, 1, 1), f"ntitle {n.key}", o=fo)
+        if n.sub: text(S, n.x + 10, n.y + 34, n.sub, 10.5, (0.88, 0.88, 0.9), f"nsub {n.key}", o=fo)
+        for i, name in enumerate(n.exec_outs):
+            if name: text(S, n.x + NW - 24, n.y + n.head + 22 + 20 * i, name, 11, TXT, f"exec {n.key} {i}", j=1, o=fo)
+        for (k, t) in n.ins: text(S, n.pin_in[k][0] + 12, n.pin_in[k][1] + 4, label(k), 11, TXT, f"in {n.key} {k}", o=fo)
+        for (k, t) in n.outs: text(S, n.pin_out[k][0] - 12, n.pin_out[k][1] + 4, label(k), 11, TXT, f"out {n.key} {k}", j=1, o=fo)
+        if n.desk: text(S, n.x + 12, n.y + n.h - 10, f"+ {n.desk} stated by the desk", 10, SUB, f"desk {n.key}", o=fo)
 
-def draw_scene(S, title, sub, NODES, order, positions, optional, both_lit, NW=134, NH=66, pre_caption=None, caption=None, legend=True, cols=None):
-    """NODES: action -> (words, lane, tool). positions: action -> (col, row). optional: drawn dashed and never lit. both_lit: alternatives that are lit together."""
-    ROWY = [196 + 76 * r for r in range(7)]; X0 = 50; maxc = max(c for c, _ in positions.values())
-    COLP = (W - 2 * X0 - NW) / maxc; pos = {a: (X0 + NW / 2 + positions[a][0] * COLP, ROWY[positions[a][1]]) for a in NODES}
-    edges = [e for e in reduce_edges(order, None)]
-    PE = [e for e in edges if e[0] not in optional and e[1] not in optional]
-    LIGHT, SEND, TRAVEL = 8, 10, 24; lit, arrive = {}, {}
-    for a in order:
-        if a in optional: continue
-        lit[a] = max([arrive[(u, a)] for (u, v) in PE if v == a and (u, a) in arrive] or [44])
-        for (u, v) in PE:
-            if u == a: arrive[(u, v)] = lit[a] + SEND + TRAVEL
-    end = max(lit.values()) + LIGHT
-    def route(u, v):
-        (xu, yu), (xv, yv) = pos[u], pos[v]; s = (xu + NW / 2, yu); t = (xv - NW / 2, yv)
-        return [list(s), list(t)] if yu == yv else [list(s), [t[0] - 20, yu], [t[0] - 20, yv], list(t)]
-    rect(S, 0, 0, W, H, BG, "background", r=0)
-    text(S, 40, 50, title, 30, INK, "title", o=S.fade(0, 14)); text(S, 40, 80, sub, 15, MUTE, "subtitle", o=S.fade(6, 20))
-    if legend:
-        lx = 40
-        for lane, label in legend:
-            rect(S, lx, 104, 14, 14, LANE[lane], f"legend {lane}", r=3, o=S.fade(10, 24)); text(S, lx + 22, 116, label, 14, INK, f"legend {lane} text", o=S.fade(10, 24)); lx += 44 + 8 * len(label)
-        rect(S, lx, 104, 14, 14, (1, 1, 1), "legend gpu", r=3, stroke=RED, sw=2, o=S.fade(10, 24)); text(S, lx + 22, 116, "red outline: the one GPU", 14, INK, "legend gpu text", o=S.fade(10, 24))
-    paths = {e: rounded(route(*e)) for e in edges}
-    for e in edges: rail(S, paths[e], RAIL, 4, f"rail {e}", o=S.fade(10, 30), dash=e not in PE)
-    for e in PE: rail(S, paths[e], LANE[NODES[e[0]][1]], 4, f"travel {e}", trim=(lit[e[0]] + SEND, lit[e[0]] + SEND + TRAVEL))
-    for (u, v) in edges:
-        tx, ty = route(u, v)[-1]; tri = {"c": True, "v": [[tx, ty], [tx - 9, ty - 6], [tx - 9, ty + 6]], "i": [[0, 0]] * 3, "o": [[0, 0]] * 3}
-        S.add({"ty": 4, "nm": f"arrow {u}", "ks": ks(o=S.fade(10, 30)), "shapes": [{"ty": "gr", "nm": "arrow", "it": [{"ty": "sh", "ks": still(tri)}, {"ty": "fl", "c": still(list(MUTE) + [1]), "o": still(100), "r": 1}, TR]}]})
-    for a in NODES:
-        (x, y), (words, lane, tool) = pos[a], NODES[a]; skipped = a in optional; edge = RED if a in GPU else (0.62, 0.65, 0.7)
-        rect(S, x - NW / 2, y - NH / 2, NW, NH, (1, 1, 1) if not skipped else (0.95, 0.95, 0.93), f"node {a}", stroke=edge, o=S.fade(8, 22))
-        if not skipped: rect(S, x - NW / 2, y - NH / 2, NW, NH, tint(LANE[lane]), f"lit {a}", stroke=RED if a in GPU else LANE[lane], o=S.lin([(lit[a], [0]), (lit[a] + LIGHT, [100])]))
-        sh = MUTE if skipped else INK
-        text(S, x, y - 10, words, 14, sh, f"name {a}", j=2, o=S.fade(12, 26)); text(S, x, y + 6, tool, 11, MUTE, f"tool {a}", j=2, o=S.fade(12, 26)); text(S, x, y + 22, timing(a), 12, MUTE, f"time {a}", j=2, o=S.fade(12, 26))
-        if a in GPU: text(S, x + NW / 2 - 6, y - NH / 2 - 4, "GPU", 11, RED, f"gpu {a}", j=1, o=S.fade(12, 26))
-    return pos, end, PE, lit, paths
+def run_scene(S, nodes, exec_edges, order, data_edges, title, sub, caps, step=17, extra=None):
+    """nodes: key -> Node. exec_edges: (src, out_index, dst). order: keys in the order they run. data_edges: (src, fact, dst, fact, dashed)."""
+    for k in order: pass
+    T0 = 36; lit = {k: T0 + i * step for i, k in enumerate(order)}
+    ein = {k: set() for k in nodes}; eout = {k: [False] * len(nodes[k].exec_outs) for k in nodes}; win = {k: set() for k in nodes}; wout = {k: set() for k in nodes}
+    for (s, i, d) in exec_edges: ein[d].add(s); eout[s][i] = True
+    for (s, f, d, g, dash) in data_edges: wout[s].add(f); win[d].add(g)
+    grid_bg(S)
+    for (s, f, d, g, dash) in data_edges:                                                   # wires under the nodes
+        ps, pd = nodes[s].pin_out_pos(f), nodes[d].pin_in_pos(g)
+        t = pin_type_for(nodes[s], f); wire(S, ps, pd, PIN[t], 2.4, lit[s] + 6, lit[s] + 26, f"data {s} {f} {d}", dash=dash)
+    for (s, i, d) in exec_edges:
+        wire(S, nodes[s].exec_out_pos[i], nodes[d].exec_in_pos, WHITE, 3.2, lit.get(d, T0) - 16, lit.get(d, T0) - 2, f"exec {s} {d}", dash=(s in nodes and nodes[s].dim) or nodes[d].dim)
+    for k, n in nodes.items(): n.draw(win[k], wout[k], lit.get(k) if not n.dim else None, bool(ein[k]), eout[k])
+    if extra: extra(S, nodes, lit)
+    # the camera: a null that moves the graph so the running node stays in view
+    cam = []; cx = cy = None
+    for k in order:
+        n = nodes[k]; tx = min(max(n.x + NW / 2 - 760, 0), CAMX[0]); ty = min(max(n.y + n.h / 2 - 270, 0), CAMX[1]); cam.append((lit[k] - 10, [40 - tx, 150 - ty, 0]))
+    cam = [(0, cam[0][1])] + cam
+    S.add({"ty": 3, "nm": "camera", "ks": {"o": still(100), "r": still(0), "p": S.lin(cam, ease=True), "a": still([0, 0, 0]), "s": still([100, 100, 100])}})
+    end = lit[order[-1]] + 40
+    return lit, end
 
-layers_all = []
-# ======================= scene 1: the presence slice, the relay, the edit and the score
-S1 = Scene(0, 0)
-N1 = {
- "fetch-clips": ("Fetch motion clips", "body", "muscle-drive release"), "encode-packets": ("Encode to packets", "body", "packets-guest"),
- "route-model": ("Route: model", "body", "zone-router-guest"), "route-relay": ("Route: relay", "body", "transport-zone-relay (C)"),
- "seal-and-take": ("Seal and take", "body", "observer-guest"), "judge": ("Judge", "body", "observer-guest"),
- "agree": ("Agree", "body", "replica-guest, 4 copies"), "skip-agree": ("Skip agreeing", "body", "pass through"),
- "play-curve": ("Play the curve", "body", "curve-guest"), "fit-anny": ("Fit the avatar", "avatar", "anny-fit-guest"),
- "follow": ("Avatar follows", "avatar", "anny-follow-guest"), "snapshot": ("Take a snapshot", "avatar", "presence-gates"),
- "load-omnigen2-transformer": ("Load OmniGen2", "model", "transformer"), "load-editscore-lora": ("Load EditScore", "model", "LoRA"),
- "merge-editscore-lora": ("Merge the LoRA", "model", "into OmniGen2"), "load-qwen25vl-conditioner": ("Load Qwen2.5-VL", "model", "conditioner"),
- "load-omnigen2-vae": ("Load the VAE", "model", "OmniGen2"), "edit": ("Edit the snapshot", "edit", "OmniGen2 + EditScore"),
- "score": ("Score the edit", "edit", "EditScore"), "check-mul-mat": ("Check mul_mat", "edit", "Lean guest")}
-P1 = {"fetch-clips": (0, 0), "encode-packets": (1, 0), "route-model": (2, 0), "route-relay": (2, 1), "seal-and-take": (3, 0), "judge": (4, 0), "agree": (5, 0), "skip-agree": (5, 1),
-      "play-curve": (6, 0), "fit-anny": (6, 1), "follow": (7, 0), "snapshot": (8, 0), "edit": (9, 0), "score": (10, 0),
-      "load-omnigen2-transformer": (4, 3), "load-editscore-lora": (4, 4), "merge-editscore-lora": (6, 3), "load-qwen25vl-conditioner": (7, 3), "load-omnigen2-vae": (8, 3), "check-mul-mat": (10, 4)}
-O1 = ["fetch-clips", "encode-packets", "route-model", "route-relay", "seal-and-take", "judge", "agree", "skip-agree", "play-curve", "fit-anny", "follow", "snapshot",
-      "load-omnigen2-transformer", "load-editscore-lora", "merge-editscore-lora", "load-qwen25vl-conditioner", "load-omnigen2-vae", "edit", "score", "check-mul-mat"]
-assert set(O1) == set(N1) == set(P1), (set(O1) ^ set(N1), set(N1) ^ set(P1))
-pos1, end1, PE1, lit1, _ = draw_scene(S1, "Part 1. From a moving body to an edited, scored image",
-    "Each box waits for the rails into it. Two ways to route (the model or the relay) and two ways to agree (replicas or pass through) are both drawn.",
-    N1, O1, P1, set(), set(),
-    legend=[("body", "the body's packets"), ("avatar", "the avatar"), ("model", "load the edit models"), ("edit", "edit and score")])
-cap_y = 196 + 76 * 5 + 10
-text(S1, 40, cap_y, "The relay is transport-zone-relay: a C state machine equal to the router model, on two UDP sockets and a 64 Hz tick.", 15, INK, "cap1", o=S1.fade(end1 + 4, end1 + 18))
-text(S1, 40, cap_y + 24, "Every box also needs its own repository to pass its gate (not drawn). Most of this slice has not been timed; only the loads, the edit and the score have.", 15, MUTE, "cap2", o=S1.fade(end1 + 10, end1 + 24))
-text(S1, 40, cap_y + 48, "Next, inside the relay, then the AUX route: from an image or a mesh to labelled, rigged garment parts.", 15, INK, "cap3", o=S1.fade(end1 + 16, end1 + 30))
-T1 = end1 + 80                                      # scene 1 lasts as long as its traversal plus a pause for the captions
-for l in S1.layers: l["op"] = T1
-layers_all += list(reversed(S1.layers))
+def grid_bg(S):
+    S.add({"ty": 4, "nm": "background", "ks": ks(), "shapes": [rc(0, 0, W, H, BGC, 0)]})
+    for step, col, wd, nm in ((20, GRID1, 1, "grid fine"), (100, GRID2, 1.5, "grid bold")):
+        for ax in ("v", "h"):
+            n = (W if ax == "v" else H) // step + 1
+            rect = {"ty": "rc", "d": 1, "s": still([wd, H] if ax == "v" else [W, wd]), "p": still([0, H / 2] if ax == "v" else [W / 2, 0]), "r": still(0)}
+            rp = {"ty": "rp", "c": still(n), "o": still(0), "m": 0, "tr": {"ty": "tr", "p": still([step, 0] if ax == "v" else [0, step]), "a": still([0, 0]), "s": still([100, 100]), "r": still(0), "so": still(100), "eo": still(100)}}
+            S.add({"ty": 4, "nm": f"{nm} {ax}", "ks": ks(), "shapes": [{"ty": "gr", "nm": nm, "it": [rect, {"ty": "fl", "c": still(list(col) + [1]), "o": still(100), "r": 1}, rp, TR]}]})
+def overlay(S, title, sub, caps, t_caps):
+    S.add({"ty": 4, "nm": "title strip", "ks": ks(), "shapes": [rc(0, 0, W, 112, (0.05, 0.05, 0.057), 0)]})
+    text(S, 40, 52, title, 30, (1, 1, 1), "title", o=S.fade(0, 14)); text(S, 40, 82, sub, 15, SUB, "subtitle", o=S.fade(6, 20))
+    S.add({"ty": 4, "nm": "caption strip", "ks": ks(o=S.fade(t_caps, t_caps + 12)), "shapes": [rc(0, H - 100, W, 100, (0.05, 0.05, 0.057), 0)]})
+    for i, (t, c) in enumerate(caps): text(S, 40, H - 70 + 26 * i, t, 15, c, f"caption {i}", o=S.fade(t_caps + 4 * i, t_caps + 16 + 4 * i))
+CAMX = [0, 0]
+def pin_type_for(n, f): return dict(n.outs)[f]
+Node.pin_out_pos = lambda n, f: n.pin_out[f]; Node.pin_in_pos = lambda n, f: n.pin_in[f]
 
+def build_nodes(S, spec, order_all):
+    """spec: key -> dict(x, y, title, sub, kind, exec_outs, dim). Pins are the facts the step reads and sets, wired when another step sets them."""
+    nodes = {}; data_edges = []; real = [k for k in order_all if k in ACT]
+    wired_reads = {k: [] for k in real}; produced = {}
+    for i, v in enumerate(real):
+        for f in reads(v):
+            prior = [u for u in real[:i] if f in sets(u)]
+            if prior:
+                last = prior[-1]; group = [u for u in prior if u in ALTGRP.get(last, ())] if last in ALTGRP else []
+                for u in dict.fromkeys(group + [last]): data_edges.append((u, f, v, f, u != last)); wired_reads[v].append(f)
+    ins = {v: [(f, pin_type(f)) for f in dict.fromkeys(wired_reads[v])] for v in real}
+    outs = {u: [(f, pin_type(f)) for f in sets(u) if any(e[0] == u and e[1] == f for e in data_edges)] for u in real}
+    for k, sp in spec.items():
+        if k in ACT:
+            desk = len([f for f in set(reads(k)) if f not in wired_reads[k]])
+            tool = sp.get("tool", ""); sub = (tool + " · " if tool else "") + timing(k) + (" · GPU" if "/input/gpu" in reads(k) else "")
+            nodes[k] = Node(S, k, sp["x"], sp["y"], sp["title"], sub, sp["kind"], ins[k], outs[k], exec_outs=sp.get("exec_outs", ("",)), desk=desk, dim=sp.get("dim", False))
+        else: nodes[k] = Node(S, k, sp["x"], sp["y"], sp["title"], sp.get("sub", ""), sp["kind"], sp.get("ins", []), sp.get("outs", []), exec_outs=sp["exec_outs"], desk=0, dim=sp.get("dim", False))
+    for n in nodes.values(): n.anchors()
+    return nodes, data_edges
+ALTGRP = {"route-model": ("route-relay",), "route-relay": ("route-model",), "agree": ("skip-agree",), "skip-agree": ("agree",), "use-dataset-mesh": ("pixal3d-image-to-mesh",), "pixal3d-image-to-mesh": ("use-dataset-mesh",)}
 
-# ======================= scene: inside the relay (transport-zone-relay, docs/zone-net.md and docs/zone-relay.md)
-SL = Scene(T1, 0); NWL, NHL = 150, 76; AMB = (0.96, 0.62, 0.04); GRN = (0.06, 0.73, 0.51); BLU = LANE["body"]
-LN = {"clients": (110, 190, "Clients send", "two frames every", "6 ticks"), "ports": (110, 300, "Two UDP ports", "PORT: parts 0-11", "PORT+1: parts 12-20"),
-      "drain": (330, 300, "Drain the sockets", "recvmmsg, up to 32", "datagrams at a time"), "who": (620, 300, "Who sent it?", "source address = person", "zone = person / 4"),
-      "put": (910, 300, "Offer the frame", "zr_put: 1 in 5 ticks,", "a burst of two"), "send": (1200, 300, "Send to the other 3", "sendmmsg, from the", "port of the same half"),
-      "tick": (1200, 520, "Tick every zone", "now + 1; a slot silent", "192 ticks is emptied"), "catch": (910, 520, "Catch up if late", "one tick for each tick", "the wall has had"),
-      "wait": (620, 520, "Wait for the tick", "64 Hz: one tick is", "1.5625e-2 s"), "refused": (910, 190, "Refused, counted", "too long, a 5th person,", "or a half taken too soon")}
-L = lambda k: LN[k]
-top = lambda k: (L(k)[0], L(k)[1] - NHL / 2); bot = lambda k: (L(k)[0], L(k)[1] + NHL / 2)
-rgt = lambda k: (L(k)[0] + NWL / 2, L(k)[1]); lft = lambda k: (L(k)[0] - NWL / 2, L(k)[1])
-EL = [("clients", "ports", [bot("clients"), top("ports")], BLU, None), ("ports", "drain", [rgt("ports"), lft("drain")], BLU, None),
-      ("drain", "who", [rgt("drain"), lft("who")], BLU, None), ("who", "put", [rgt("who"), lft("put")], BLU, None),
-      ("put", "send", [rgt("put"), lft("send")], BLU, "taken"), ("send", "tick", [bot("send"), top("tick")], BLU, None),
-      ("tick", "catch", [lft("tick"), rgt("catch")], BLU, None), ("catch", "wait", [lft("catch"), rgt("wait")], BLU, None),
-      ("wait", "drain", [lft("wait"), (L("drain")[0], L("wait")[1]), bot("drain")], GRN, "next tick"),
-      ("put", "refused", [top("put"), bot("refused")], AMB, "refused"), ("refused", "tick", [rgt("refused"), (1390, L("refused")[1]), (1390, L("tick")[1]), rgt("tick")], AMB, None)]
-TRAV, SND = 22, 10; litL = {"clients": 40}; start = {}
-for (a, b, pts, col, lab) in EL[:9]:
-    start[(a, b)] = litL[a] + SND
-    if b not in litL: litL[b] = start[(a, b)] + TRAV
-loop_back_end = start[("wait", "drain")] + TRAV
-start[("put", "refused")] = loop_back_end + 20; litL["refused"] = start[("put", "refused")] + TRAV
-start[("refused", "tick")] = litL["refused"] + SND; endL = start[("refused", "tick")] + TRAV + 8
-rect(SL, 0, 0, W, H, BG, "background", r=0)
-text(SL, 40, 50, "Inside the relay: one loop, 64 times a second", 30, INK, "title", o=SL.fade(0, 14))
-text(SL, 40, 80, "transport-zone-relay, in C. Strict C99, no heap, and it never reads a byte of a frame. A zone is four people; a frame is 1,200 bytes.", 15, MUTE, "subtitle", o=SL.fade(6, 20))
-for (a, b, pts, col, lab) in EL:
-    pth = rounded([list(p) for p in pts]); rail(SL, pth, RAIL, 4, f"rail {a} {b}", o=SL.fade(10, 30), dash=(col == AMB))
-    rail(SL, pth, col, 4, f"travel {a} {b}", trim=(start[(a, b)], start[(a, b)] + TRAV))
-    (x1, y1), (x2, y2) = pts[-2], pts[-1]; dl = math.hypot(x2 - x1, y2 - y1); dx, dy = (x2 - x1) / dl, (y2 - y1) / dl
-    tri = {"c": True, "v": [[x2, y2], [x2 - 9 * dx - 6 * dy, y2 - 9 * dy + 6 * dx], [x2 - 9 * dx + 6 * dy, y2 - 9 * dy - 6 * dx]], "i": [[0, 0]] * 3, "o": [[0, 0]] * 3}
-    SL.add({"ty": 4, "nm": f"arrow {a} {b}", "ks": ks(o=SL.fade(10, 30)), "shapes": [{"ty": "gr", "nm": "arrow", "it": [{"ty": "sh", "ks": still(tri)}, {"ty": "fl", "c": still(list(MUTE) + [1]), "o": still(100), "r": 1}, TR]}]})
-    if lab:
-        lp = {"taken": ((rgt("put")[0] + lft("send")[0]) / 2, L("put")[1] - 8), "refused": (L("put")[0] + 8, (top("put")[1] + bot("refused")[1]) / 2 + 4), "next tick": ((lft("wait")[0] + L("drain")[0]) / 2 - 18, L("wait")[1] - 8)}[lab]
-        text(SL, lp[0], lp[1], lab, 12, col if col != BLU else INK, f"label {lab}", j=1 if lab == "refused" else 2, o=SL.fade(12, 30))
-for k, (x, y, name, l1, l2) in LN.items():
-    col = AMB if k == "refused" else BLU; edge = (0.62, 0.65, 0.7)
-    rect(SL, x - NWL / 2, y - NHL / 2, NWL, NHL, (1, 1, 1), f"node {k}", stroke=edge, o=SL.fade(8, 22))
-    rect(SL, x - NWL / 2, y - NHL / 2, NWL, NHL, tint(col), f"lit {k}", stroke=col, o=SL.lin([(litL[k], [0]), (litL[k] + 8, [100])]))
-    text(SL, x, y - 14, name, 14, INK, f"name {k}", j=2, o=SL.fade(12, 26)); text(SL, x, y + 4, l1, 11, MUTE, f"l1 {k}", j=2, o=SL.fade(12, 26)); text(SL, x, y + 18, l2, 11, MUTE, f"l2 {k}", j=2, o=SL.fade(12, 26))
-for i, t in enumerate(["Measured at 256 people", "Linux, two shared vCPUs,", "loopback, two runs:", "median tick 1.625e-3 s", "and 1.655e-3 s", "99th percentile 2.43e-3 s", "and 2.33e-3 s", "per datagram out 4.626e-6 s", "and 4.659e-6 s", "The budget aimed at is", "4e-3 s (RFD66606-2442),", "not a gate"]):
-    text(SL, 1440, 250 + 22 * i, t, 14 if i == 0 else 13, INK if i == 0 else MUTE, f"stat {i}", o=SL.fade(14, 30))
-text(SL, 40, 628, "A taken frame is copied in and handed out unchanged, and sent on as it arrives, so none waits in the relay longer than one tick.", 16, INK, "cap1", o=SL.fade(endL, endL + 14))
-text(SL, 40, 654, "A viewer gets six frames a send interval: two from each of the three others. A frame that comes too soon is refused and counted, and its bytes are not copied.", 15, MUTE, "cap2", o=SL.fade(endL + 6, endL + 20))
-text(SL, 40, 680, "Checked against the router model's recorded trace (210 ticks). The sockets are checked on loopback on one machine only; no real network.", 15, MUTE, "cap3", o=SL.fade(endL + 12, endL + 26))
-TL = T1 + endL + 100
-for l in SL.layers: l["op"] = TL
-layers_all += list(reversed(SL.layers))
+C = lambda i: 40 + i * 246
+layers_all = []; scene_list = []
+# ================= scene 1: the presence slice
+S1 = Scene(0)
+K1 = {"fetch-clips": ("Fetch motion clips", "body", "muscle-drive release"), "encode-packets": ("Encode to packets", "body", "packets-guest"), "route-model": ("Route: model", "body", "zone-router-guest"),
+      "route-relay": ("Route: relay", "body", "transport-zone-relay"), "seal-and-take": ("Seal and take", "body", "observer-guest"), "judge": ("Judge", "body", "observer-guest"),
+      "agree": ("Agree", "body", "replica-guest"), "skip-agree": ("Skip agreeing", "body", "pass through"), "play-curve": ("Play the curve", "body", "curve-guest"),
+      "fit-anny": ("Fit the avatar", "avatar", "anny-fit-guest"), "follow": ("Avatar follows", "avatar", "anny-follow-guest"), "snapshot": ("Take a snapshot", "avatar", "presence-gates"),
+      "load-omnigen2-transformer": ("Load OmniGen2", "model", "transformer"), "load-editscore-lora": ("Load EditScore", "model", "LoRA"), "merge-editscore-lora": ("Merge the LoRA", "model", "into OmniGen2"),
+      "load-qwen25vl-conditioner": ("Load Qwen2.5-VL", "model", "conditioner"), "load-omnigen2-vae": ("Load the VAE", "model", "OmniGen2"), "edit": ("Edit the snapshot", "edit", "OmniGen2 + EditScore"),
+      "score": ("Score the edit", "edit", "EditScore"), "check-mul-mat": ("Check mul_mat", "edit", "Lean guest")}
+POS1 = {"fetch-clips": (0, 20), "encode-packets": (1, 20), "ROUTE": (2, 20), "route-model": (3, 20), "route-relay": (3, 300), "seal-and-take": (4, 20), "judge": (5, 20), "AGREE": (6, 20),
+        "agree": (7, 20), "skip-agree": (7, 300), "play-curve": (8, 20), "fit-anny": (9, 20), "follow": (10, 20), "snapshot": (11, 20), "load-omnigen2-transformer": (12, 20),
+        "load-editscore-lora": (13, 20), "merge-editscore-lora": (14, 20), "load-qwen25vl-conditioner": (15, 20), "load-omnigen2-vae": (16, 20), "edit": (17, 20), "score": (18, 20), "check-mul-mat": (18, 330)}
+spec1 = {k: dict(x=C(POS1[k][0]), y=POS1[k][1], title=v[0], kind=v[1], tool=v[2], exec_outs=("",), dim=False) for k, v in K1.items()}
+spec1["route-relay"]["dim"] = spec1["skip-agree"]["dim"] = True
+spec1["ROUTE"] = dict(x=C(2), y=20, title="Route", sub="the first way that works", kind="branch", exec_outs=("model", "relay"))
+spec1["AGREE"] = dict(x=C(6), y=20, title="Agree?", sub="replicas, or pass through", kind="branch", exec_outs=("replicas", "pass through"))
+for k in ("ROUTE", "AGREE"): spec1[k]["x"] = C(POS1[k][0])
+order1 = ["fetch-clips", "encode-packets", "ROUTE", "route-model", "route-relay", "seal-and-take", "judge", "AGREE", "agree", "skip-agree", "play-curve", "fit-anny", "follow", "snapshot",
+          "load-omnigen2-transformer", "load-editscore-lora", "merge-editscore-lora", "load-qwen25vl-conditioner", "load-omnigen2-vae", "edit", "score", "check-mul-mat"]
+nodes1, de1 = build_nodes(S1, spec1, order1)
+ex1 = [("fetch-clips", 0, "encode-packets"), ("encode-packets", 0, "ROUTE"), ("ROUTE", 0, "route-model"), ("ROUTE", 1, "route-relay"), ("route-model", 0, "seal-and-take"), ("route-relay", 0, "seal-and-take"),
+       ("seal-and-take", 0, "judge"), ("judge", 0, "AGREE"), ("AGREE", 0, "agree"), ("AGREE", 1, "skip-agree"), ("agree", 0, "play-curve"), ("skip-agree", 0, "play-curve"), ("play-curve", 0, "fit-anny"),
+       ("fit-anny", 0, "follow"), ("follow", 0, "snapshot"), ("snapshot", 0, "load-omnigen2-transformer"), ("load-omnigen2-transformer", 0, "load-editscore-lora"), ("load-editscore-lora", 0, "merge-editscore-lora"),
+       ("merge-editscore-lora", 0, "load-qwen25vl-conditioner"), ("load-qwen25vl-conditioner", 0, "load-omnigen2-vae"), ("load-omnigen2-vae", 0, "edit"), ("edit", 0, "score")]
+CAMX[0] = C(19) + NW - (W - 80); CAMX[1] = 0
+lit1, end1 = run_scene(S1, nodes1, ex1, order1, de1, "", "", [])
+overlay(S1, "Part 1. From a moving body to an edited, scored image", "White wires are the sequence the planner runs. Coloured pins are facts a step reads (left) and sets (right).",
+        [("The relay is transport-zone-relay: a C state machine equal to the router model, on two UDP sockets and a 64 Hz tick. Both ways to route are drawn; the planner tries the model first.", TXT),
+         ("Most of this slice has not been timed. Only the loads, the edit and the score have. Every step also needs its own repository to pass its gate (not drawn).", SUB),
+         ("Next, inside the relay, then the AUX route.", TXT)], end1 - 10)
+S1.t1 = end1 + 60; scene_list.append(S1)
 
-# ======================= scene 2: the AUX route, from its own plan
-S2 = Scene(TL, 0)
-def stamp(s): return dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
-origin = stamp(aux_plan["temporal"]["origin"]); order2 = []; win = {}
-for st in aux_plan["steps"]:
-    if st["action"] not in win: order2.append(st["action"]); win[st["action"]] = (int((stamp(st["start"]) - origin).total_seconds()), int((stamp(st["end"]) - origin).total_seconds()))
-N2 = {
- "relabel-coco": ("Regroup photo labels", "labels", "COCO, 7 part types"), "make-synth-set": ("Render practice images", "labels", "Mitsuba 3"),
- "train-part-detector": ("Train part detector", "labels", "RF-DETR"), "segment-labels": ("Label each part", "labels", "Alchemy3D-Segment"),
- "restore-units": ("Undo the scaling", "labels", "units.py"), "close-labelling": ("Labels finished", "labels", ""),
- "use-dataset-mesh": ("Use dataset mesh", "labels", "GarmentCode"), "ingest-usd": ("Load mesh", "labels", "OpenUSD"),
- "unitise-source": ("Scale to unit cube", "labels", "units.py"), "write-scale-sidecar": ("Save the scale", "labels", "units.py"),
- "matte-image": ("Matte the image", "labels", "BiRefNet HR"), "pixal3d-image-to-mesh": ("Image to mesh", "labels", "Pixal3D on TRELLIS.2"),
- "build-warp": ("Build cloth simulator", "motion", "Warp"), "measure-motion-lag": ("Measure part lag", "motion", "Warp, not run yet"),
- "classify-soft-rigid": ("Soft or rigid?", "motion", "not built yet"), "rig-aux-parts": ("Rig the parts", "rig", "not built yet"),
- "make-hair-cards": ("Make hair cards", "hair", "HairDeck"), "make-spring-chains": ("Make spring chains", "hair", "HairDeck")}
-R2 = {"relabel-coco": 0, "make-synth-set": 1, "train-part-detector": 1, "segment-labels": 1, "restore-units": 1, "close-labelling": 1, "use-dataset-mesh": 2, "ingest-usd": 2, "unitise-source": 2,
-      "write-scale-sidecar": 2, "matte-image": 3, "pixal3d-image-to-mesh": 3, "build-warp": 4, "measure-motion-lag": 4, "classify-soft-rigid": 4, "rig-aux-parts": 4, "make-hair-cards": 5, "make-spring-chains": 5}
-ALT = [a for a in N2 if a not in win]; assert set(order2) | set(ALT) == set(N2), (set(order2) | set(ALT)) ^ set(N2)
-full = order2[:order2.index("ingest-usd")] + ALT + order2[order2.index("ingest-usd"):]
-E = reduce_edges(full, None); E = [e for e in E if not (e[1] in ALT and e[0] not in ALT)]
-depth = {}
-for a in full: depth[a] = 1 + max([depth[u] for (u, v) in E if v == a] or [-1])
-P2 = {a: (depth[a], R2[a]) for a in N2}
-dur2 = {a: win[a][1] - win[a][0] for a in order2}
-PE2 = [e for e in E if e[0] not in ALT and e[1] not in ALT]; best = {}
-for a in order2: best[a] = dur2[a] + max([best[u] for (u, v) in PE2 if v == a] or [0])
-tail = max(order2, key=lambda a: best[a]); crit = [tail]
-while True:
-    prev = [u for (u, v) in PE2 if v == crit[0] and best[u] + dur2[crit[0]] == best[crit[0]]]
-    if not prev: break
-    crit.insert(0, prev[0])
-pos2, end2, PE2b, lit2, paths2 = draw_scene(S2, "Part 2. From an image or a mesh to rigged garment parts",
-    "The planner's route for the AUX goal. A step starts when everything feeding it has finished. Dashed is the other way to get a mesh.",
-    N2, full, P2, set(ALT), set(),
-    legend=[("labels", "find and label the parts"), ("motion", "learn which parts move"), ("hair", "hair and tail chains"), ("rig", "rig the parts")])
-CF = end2 + 24
-for (u, v) in zip(crit, crit[1:]):
-    (xu, yu), (xv, yv) = pos2[u], pos2[v]; s = (xu + 67, yu); t = (xv - 67, yv)
-    pts = [list(s), list(t)] if yu == yv else [list(s), [t[0] - 20, yu], [t[0] - 20, yv], list(t)]; rail(S2, rounded(pts), RED, 8, f"critical {u} {v}", o=S2.lin([(CF, [0]), (CF + 14, [100])]))
-text(S2, 40, 648, f"Longest chain, in red: {' > '.join(N2[a][0].lower().rstrip('?') for a in crit)}. It sets the {best[tail] // 60} minutes.", 16, INK, "cap1", o=S2.lin([(CF + 4, [0]), (CF + 22, [100])]))
-text(S2, 40, 674, "The total leaves out the image-to-mesh steps and the presence slice: none of them has been timed.", 15, MUTE, "cap2", o=S2.lin([(CF + 10, [0]), (CF + 28, [100])]))
-OP = TL + end2 + 100
-for l in S2.layers: l["op"] = OP
-layers_all += list(reversed(S2.layers))
+# ================= scene 2: inside the relay
+S2 = Scene(S1.t1)
+spec2 = {"EVENT": dict(x=C(0), y=20, title="Event Tick", sub="64 Hz: one tick is 1.5625e-2 s", kind="event", ins=[], outs=[], exec_in=False, exec_outs=("",)),
+         "DRAIN": dict(x=C(1), y=20, title="Drain the sockets", sub="recvmmsg, up to 32 at a time", kind="labels", ins=[("PORT", "int"), ("PORT+1", "int")], outs=[("Datagrams", "struct")], exec_outs=("",)),
+         "EACH": dict(x=C(2), y=20, title="For Each Datagram", sub="", kind="macro", ins=[("Array", "struct")], outs=[("Element", "struct")], exec_outs=("Loop Body", "Completed")),
+         "WHO": dict(x=C(3), y=20, title="Who sent it?", sub="source address = person", kind="labels", ins=[("Datagram", "struct")], outs=[("Zone", "int"), ("Slot", "int"), ("Half", "int")], exec_outs=("",)),
+         "PUT": dict(x=C(4), y=20, title="Offer the frame", sub="zr_put: 1 in 5 ticks, burst of two", kind="labels", ins=[("Zone", "int"), ("Slot", "int"), ("Half", "int"), ("Bytes", "struct")], outs=[("Taken", "bool")], exec_outs=("",)),
+         "BR": dict(x=C(5), y=20, title="Branch", sub="", kind="branch", ins=[("Condition", "bool")], outs=[], exec_outs=("True", "False")),
+         "SEND": dict(x=C(6), y=20, title="Send to the other 3", sub="sendmmsg, from the port of the same half", kind="labels", ins=[("Zone", "int"), ("Slot", "int"), ("Half", "int")], outs=[], exec_outs=("",)),
+         "REFUSE": dict(x=C(6), y=250, title="Count it refused", sub="too long, a 5th person, or a half taken too soon", kind="hair", ins=[], outs=[], exec_outs=("",)),
+         "TICKZ": dict(x=C(3), y=330, title="Tick every zone", sub="now + 1; a slot silent over 192 ticks is emptied", kind="motion", ins=[], outs=[], exec_outs=("",)),
+         "CATCH": dict(x=C(4), y=330, title="Catch up if late", sub="one tick for each tick the wall has had", kind="motion", ins=[], outs=[], exec_outs=("",)),
+         "WAIT": dict(x=C(5), y=330, title="Wait for the next tick", sub="then run the loop again", kind="motion", ins=[], outs=[], exec_outs=("",))}
+nodes2 = {k: Node(S2, k, v["x"], v["y"], v["title"], v.get("sub", ""), v["kind"], v["ins"], v["outs"], exec_in=v.get("exec_in", True), exec_outs=v["exec_outs"]) for k, v in spec2.items()}
+for n in nodes2.values(): n.anchors()
+order2 = ["EVENT", "DRAIN", "EACH", "WHO", "PUT", "BR", "SEND", "REFUSE", "TICKZ", "CATCH", "WAIT"]
+ex2 = [("EVENT", 0, "DRAIN"), ("DRAIN", 0, "EACH"), ("EACH", 0, "WHO"), ("WHO", 0, "PUT"), ("PUT", 0, "BR"), ("BR", 0, "SEND"), ("BR", 1, "REFUSE"), ("EACH", 1, "TICKZ"), ("TICKZ", 0, "CATCH"), ("CATCH", 0, "WAIT")]
+de2 = [("DRAIN", "Datagrams", "EACH", "Array", False), ("EACH", "Element", "WHO", "Datagram", False), ("EACH", "Element", "PUT", "Bytes", False), ("WHO", "Zone", "PUT", "Zone", False),
+       ("WHO", "Slot", "PUT", "Slot", False), ("WHO", "Half", "PUT", "Half", False), ("PUT", "Taken", "BR", "Condition", False), ("WHO", "Zone", "SEND", "Zone", False),
+       ("WHO", "Slot", "SEND", "Slot", False), ("WHO", "Half", "SEND", "Half", False)]
+def stats(S, nodes, lit):
+    x, y = C(0), 300; S.add({"ty": 4, "nm": "comment", "ks": ks(o=S.fade(10, 24)), "shapes": [rc(x, y, 226, 232, (0.2, 0.3, 0.2), 6, (0.3, 0.45, 0.3), 1.4)]})
+    for i, t in enumerate(["Measured at 256 people", "Linux, two shared vCPUs, loopback:", "median tick 1.625e-3 s, 1.655e-3 s", "99th percentile 2.43e-3 s, 2.33e-3 s", "per datagram out 4.626e-6 s,", "4.659e-6 s", "aim: a tick under 4e-3 s", "(RFD66606-2442), not a gate"]):
+        text(S, x + 10, y + 22 + 24 * i, t, 12.5 if i else 14, (1, 1, 1) if i == 0 else (0.88, 0.95, 0.88), f"stat {i}", o=S.fade(14, 28))
+CAMX[0] = C(7) + NW - (W - 80); CAMX[1] = 0
+lit2, end2 = run_scene(S2, nodes2, ex2, order2, de2, "", "", [], extra=stats)
+overlay(S2, "Part 2. Inside the relay: one loop, 64 times a second", "transport-zone-relay, in C. Strict C99, no heap, and it never reads a byte of a frame. A zone is four people.",
+        [("A taken frame is copied in, handed out unchanged and sent on as it arrives, so none waits in the relay longer than one tick. A viewer gets six frames a send interval.", TXT),
+         ("A frame that comes too soon is refused and counted, and its bytes are not copied. Checked against the router model's recorded trace (210 ticks); the sockets only on loopback.", SUB)], end2 - 10)
+S2.t1 = S2.t0 + end2 + 70; scene_list.append(S2)
 
-for i, l in enumerate(layers_all): l["ind"] = i + 1
-json.dump({"v": "5.7.0", "fr": FR, "ip": 0, "op": OP, "w": W, "h": H, "nm": "poseswap plan, as a railroad diagram", "ddd": 0, "assets": [],
-           "fonts": {"list": [{"fName": "Arial", "fFamily": "Arial", "fStyle": "Regular", "ascent": 71.6}]}, "layers": layers_all, "markers": []}, open(sys.argv[3], "w"), separators=(",", ":"))
-print("wrote", sys.argv[3], len(layers_all), "layers,", round(OP / FR, 1), "s; scene 1 ends at frame", T1, "; scene 2 lit by frame", TL + end2, "; critical", " > ".join(crit), best[tail], "s")
+# ================= scene 3: the AUX route
+S3 = Scene(S2.t1)
+K3 = {"relabel-coco": ("Regroup photo labels", "labels", "COCO, 7 part types"), "make-synth-set": ("Render practice images", "labels", "Mitsuba 3"), "train-part-detector": ("Train part detector", "labels", "RF-DETR"),
+      "use-dataset-mesh": ("Use dataset mesh", "labels", "GarmentCode"), "matte-image": ("Matte the image", "labels", "BiRefNet HR"), "pixal3d-image-to-mesh": ("Image to mesh", "labels", "Pixal3D on TRELLIS.2"),
+      "ingest-usd": ("Load mesh", "labels", "OpenUSD"), "unitise-source": ("Scale to unit cube", "labels", "units.py"), "segment-labels": ("Label each part", "labels", "Alchemy3D-Segment"),
+      "write-scale-sidecar": ("Save the scale", "labels", "units.py"), "restore-units": ("Undo the scaling", "labels", "units.py"), "close-labelling": ("Labels finished", "labels", ""),
+      "build-warp": ("Build cloth simulator", "motion", "Warp"), "measure-motion-lag": ("Measure part lag", "motion", "Warp, not run yet"), "classify-soft-rigid": ("Soft or rigid?", "motion", "not built yet"),
+      "make-hair-cards": ("Make hair cards", "hair", "HairDeck"), "make-spring-chains": ("Make spring chains", "hair", "HairDeck"), "rig-aux-parts": ("Rig the parts", "rig", "not built yet")}
+P3 = {"relabel-coco": 0, "make-synth-set": 1, "train-part-detector": 2, "MESH": 3, "use-dataset-mesh": 4, "matte-image": 4, "pixal3d-image-to-mesh": 5, "ingest-usd": 6, "unitise-source": 7, "segment-labels": 8,
+      "write-scale-sidecar": 9, "restore-units": 10, "close-labelling": 11, "build-warp": 12, "measure-motion-lag": 13, "classify-soft-rigid": 14, "make-hair-cards": 15, "make-spring-chains": 16, "rig-aux-parts": 17}
+spec3 = {k: dict(x=C(P3[k]), y=20 if k != "matte-image" and k != "pixal3d-image-to-mesh" else 320, title=v[0], kind=v[1], tool=v[2], exec_outs=("",), dim=k in ("matte-image", "pixal3d-image-to-mesh")) for k, v in K3.items()}
+spec3["MESH"] = dict(x=C(3), y=20, title="Where is the mesh from?", sub="the dataset, or an image", kind="branch", exec_outs=("dataset", "image"))
+order3 = ["relabel-coco", "make-synth-set", "train-part-detector", "MESH", "use-dataset-mesh", "matte-image", "pixal3d-image-to-mesh", "ingest-usd", "unitise-source", "segment-labels", "write-scale-sidecar",
+          "restore-units", "close-labelling", "build-warp", "measure-motion-lag", "classify-soft-rigid", "make-hair-cards", "make-spring-chains", "rig-aux-parts"]
+nodes3, de3 = build_nodes(S3, spec3, order3)
+chain = ["relabel-coco", "make-synth-set", "train-part-detector", "MESH"]
+ex3 = [(a, 0, b) for a, b in zip(chain, chain[1:])] + [("MESH", 0, "use-dataset-mesh"), ("MESH", 1, "matte-image"), ("matte-image", 0, "pixal3d-image-to-mesh"), ("use-dataset-mesh", 0, "ingest-usd"), ("pixal3d-image-to-mesh", 0, "ingest-usd")]
+tail = ["ingest-usd", "unitise-source", "segment-labels", "write-scale-sidecar", "restore-units", "close-labelling", "build-warp", "measure-motion-lag", "classify-soft-rigid", "make-hair-cards", "make-spring-chains", "rig-aux-parts"]
+ex3 += [(a, 0, b) for a, b in zip(tail, tail[1:])]
+CAMX[0] = C(18) - (W - 80) + NW; CAMX[1] = 0
+lit3, end3 = run_scene(S3, nodes3, ex3, order3, de3, "", "", [])
+overlay(S3, "Part 3. From an image or a mesh to rigged garment parts", "The planner's route for the AUX goal. The planner runs independent steps side by side; the white wire lists them one after another.",
+        [("The longest chain is: build the simulator, measure which parts lag (60 min), decide soft or rigid, rig. The one GPU is a pin passed from step to step, so GPU steps take turns.", TXT),
+         ("The 91 minutes leaves out image-to-mesh and matting: neither has been timed. Dim nodes are the image route, skipped when the dataset mesh is on hand.", SUB)], end3 - 10)
+S3.t1 = S3.t0 + end3 + 90; scene_list.append(S3)
+
+OP = S3.t1; idx = 0; out = []
+for S in scene_list:
+    cam = next(l for l in S.layers if l["ty"] == 3)
+    for l in S.layers: l["op"] = S.t1
+    S.layers.sort(key=lambda l: 0)  # keep drawing order: Lottie paints the first layer on top, so the list is reversed below
+    out += list(reversed(S.layers))
+for i, l in enumerate(out): l["ind"] = i + 1
+for S in scene_list:
+    cam = next(l for l in S.layers if l["ty"] == 3)
+    fixed = ("background", "grid fine v", "grid fine h", "grid bold v", "grid bold h", "title strip", "caption strip")
+    for l in S.layers:
+        if l is cam: continue
+        if l["nm"] in fixed or l["nm"] in ("title", "subtitle") or re.fullmatch(r"caption \d", l["nm"]): continue
+        l["parent"] = cam["ind"]
+json.dump({"v": "5.7.0", "fr": FR, "ip": 0, "op": OP, "w": W, "h": H, "nm": "poseswap plan, as Blueprints", "ddd": 0, "assets": [],
+           "fonts": {"list": [{"fName": "Arial", "fFamily": "Arial", "fStyle": "Regular", "ascent": 71.6}]}, "layers": out, "markers": []}, open(sys.argv[3], "w"), separators=(",", ":"))
+print("wrote", sys.argv[3], len(out), "layers,", round(OP / FR, 1), "s; scenes end at", [S.t1 for S in scene_list])
