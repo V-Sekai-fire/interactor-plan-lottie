@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import PlanLottie.YamlLd
+import YamlLd
 
 namespace PlanLottie
 open Lean
@@ -16,7 +16,7 @@ def readJson (path : String) : IO (Except String Json) := do
   | .error e => pure (.error e)
   | .ok t =>
     if path.endsWith ".yamlld" || path.endsWith ".yaml" then
-      pure (match YamlLd.parse t with | .ok j => .ok j | .error e => .error s!"{path}: not YAML-LD: {e}")
+      pure (match _root_.YamlLd.parse t with | .ok j => .ok j | .error e => .error s!"{path}: not YAML-LD: {e}")
     else
       pure (match Json.parse t with | .ok j => .ok j | .error e => .error s!"{path}: not JSON: {e}")
 

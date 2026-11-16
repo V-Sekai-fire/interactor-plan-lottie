@@ -35,7 +35,6 @@ One Sequence node runs a part for each plan given. To play a result, serve this 
 | Path | What it holds |
 | --- | --- |
 | `PlanLottie/`, `Main.lean` | the converter |
-| `PlanLottie/YamlLd.lean`, `YamlLdWitness.lean` | the YAML-LD reader and writer, and its checks against the examples of the specification |
 | `Witness.lean` | the checks (golden, control, invariant and leak), each with a planted fault where it can fail |
 | `inputs/domain.yamlld` | the planning domain the plans come from, as [YAML-LD](https://www.w3.org/TR/yaml-ld/) |
 | `inputs/plans/` | the plans the planner made from it, named `<n>-<name>.yamlld` |
@@ -44,7 +43,7 @@ One Sequence node runs a part for each plan given. To play a result, serve this 
 | `viewer.html` | the player |
 | `make.sh` | build, draw, check |
 
-The domain and the plans are the examples. They describe a character-editing pipeline (presence, a relay, a part-rigging route, an obstacle course, sandbox guests), and the repository does not need that pipeline to run. The domain is a copy: its source is the poseswap domain, so it can drift, and a plan made from a changed domain has to be drawn again.
+The domain and the plans are the examples, read with [lean-yaml-ld](https://github.com/V-Sekai-fire/lean-yaml-ld). They describe a character-editing pipeline (presence, a relay, a part-rigging route, an obstacle course, sandbox guests), and the repository does not need that pipeline to run. The domain is a copy: its source is the poseswap domain, so it can drift, and a plan made from a changed domain has to be drawn again.
 
 ## Change a plan
 

@@ -4,11 +4,10 @@
 # After a change you mean to make, copy lottie/<n>/transcript.md over its golden.
 set -euo pipefail
 cd "$(dirname "$0")"
-lake build plan_lottie plan_lottie_witness yamlld_witness
+lake build plan_lottie plan_lottie_witness
 BIN=.lake/build/bin
 DOM=inputs/domain.yamlld
 mkdir -p lottie
-$BIN/yamlld_witness $DOM inputs/plans/*.yamlld
 for p in inputs/plans/*.yamlld; do
   n=$(basename "$p" .yamlld)
   mkdir -p "lottie/$n"
