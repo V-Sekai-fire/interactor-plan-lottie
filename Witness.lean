@@ -151,8 +151,8 @@ def main (args : List String) : IO UInt32 := do
       let descLine := ((wrapLines (((actsOf dom).lookup described).map (·.description) |>.getD "") 44 3).headD "")
       let undescribed := setKey dom "actions" (Json.mkObj ((entries (dom.getObjValD "actions")).map fun (k, a) => (k, if k == described then setKey a "description" (str "") else a)))
       let oneStep := (plans.take 1).map fun p => setKey p "steps" (A ((items (p.getObjValD "steps")).take 1))
-      -- A cap that bites on these plans: 7 when some layer is wider than 7, else one under the widest layer (a plan of 5 nodes has nothing to cap at 7).
-      let capN := if widest m > 7 then 7 else max 1 (widest m - 1)
+      -- No number is built in: the cap these checks use is one under the widest layer of the plans given, the smallest cap that bites on them.
+      let capN := max 1 (widest m - 1)
       let checks : List Check :=
         [ { name := "GOLDEN every step of every plan is a node", ok := allSteps.all (nodeNames doc).contains },
           { name := "CONTROL a step taken out of the plans is no longer drawn", ok := !hidden || allSteps.headD "" == "" },
@@ -163,10 +163,10 @@ def main (args : List String) : IO UInt32 := do
           { name := "CONTROL a missing exec wire leaves nodes unreached", ok := !(unreached m (m.exec.drop 3 ++ m.expand)).isEmpty },
           { name := "GOLDEN with no limit set, no Extract node is drawn", ok := m.expand.isEmpty },
           { name := "INVARIANT at a cap of 30 no layer draws more than 30 nodes", ok := widest (model { c with cap := some 30 } dom plans) ≤ 30 },
-          { name := "CONTROL a layer over the cap is caught: with no limit a plan draws more nodes in one layer than the cap that bites (7, or one under the widest layer)", ok := widest m > capN },
+          { name := "CONTROL a layer over the cap is caught: with no limit a plan draws more nodes in one layer than a cap one under the widest layer", ok := widest m > capN },
           { name := "INVARIANT at a complexity limit of 10 no layer has more than 10 independent paths", ok := hardest (model { c with maxComplexity := some 10 } dom plans) ≤ 10 },
           { name := "CONTROL a layer of ten Branch nodes is over a complexity limit of 10", ok := complexity ({ order := (List.range 10).map fun i => s!"BR {i}" } : Laid) > 10 },
-          { name := "GOLDEN at the cap that bites the over-cap plans become Extract layers that hold every step", ok :=
+          { name := "GOLDEN at a cap one under the widest layer the over-cap plans become Extract layers that hold every step", ok :=
               let m7 := model { c with cap := some capN } dom plans
               widest m7 ≤ capN && heldSteps m7 == allSteps && !m7.expand.isEmpty },
           { name := "GOLDEN a complexity limit of 2 splits a plan with two Branch nodes into layers of at most 2 paths", ok :=
