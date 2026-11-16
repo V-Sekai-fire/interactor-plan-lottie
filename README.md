@@ -11,7 +11,7 @@ Draws a planner's JSON-LD plan as a Lottie animation in the style of Unreal Engi
 - A Branch node is a method with two or more alternatives. The way the plan took is lit, and the other is dim.
 - Under a node is the action's own `description` from the domain, wrapped to the node's width. The domain marks each one in `description_basis` as written or drafted. The converter draws what the domain says and does not draft anything.
 - A step's time shows its milliseconds when it has them: `56 ms`, `3.202 s`, `1 min 7 s`. A step without a stated duration says "not timed".
-- A camera follows the node that is running, so part of the graph shows at a time. The animation is 1680 x 720 at 30 frames a second.
+- A camera follows the node that is running, so part of the graph shows at a time.
 
 ## Nothing is drawn that the JSON-LD did not say
 
@@ -32,17 +32,17 @@ builds the converter, draws every plan in `inputs/plans/` into `lottie/`, and ru
     lake build plan_lottie
     .lake/build/bin/plan_lottie [--grid N] [--cap N] [--complexity N] [--transcript out.md] <domain.jsonld> <out.lottie.json> <plan.jsonld>...
 
-One Sequence node runs a part for each plan given. To play a result, serve this folder (`python3 -m http.server`) and open `/viewer.html`, or `/viewer.html?plan=2-aux` for one plan. A `file://` page cannot fetch the JSON. The viewer loads lottie-web from cdnjs, pinned by an integrity hash, and has Pause, Restart and speed controls. It starts paused if the system asks for reduced motion.
+One Sequence node runs a part for each plan given. To play a result, serve this folder (`python3 -m http.server`) and open `/viewer.html`, or `/viewer.html?plan=<n>-<name>` for one plan. A `file://` page cannot fetch the JSON. The viewer loads lottie-web from cdnjs, pinned by an integrity hash, and has Pause, Restart and speed controls. It starts paused if the system asks for reduced motion.
 
 ## What is here
 
 | Path | What it holds |
 | --- | --- |
 | `PlanLottie/`, `Main.lean` | the converter |
-| `Witness.lean` | 41 checks (golden, control, invariant and leak), each with a planted fault where it can fail |
+| `Witness.lean` | the checks (golden, control, invariant and leak), each with a planted fault where it can fail |
 | `inputs/domain.jsonld` | the planning domain the plans come from |
-| `inputs/plans/` | nine plans the planner made from it: `0-presence`, `1-relay`, `2-aux`, `3-course`, `4-guests`, `5-aux-today`, `6-snapshot`, `7-gates`, `8-cad` |
-| `lottie/` | each plan as a Lottie with its text version, and `all`, the first four together |
+| `inputs/plans/` | the plans the planner made from it, named `<n>-<name>.jsonld` |
+| `lottie/` | each plan as a Lottie with its text version, and `all`, the plans numbered 0 to 3 together |
 | `tests/golden/` | the committed text versions the checks compare against |
 | `viewer.html` | the player |
 | `make.sh` | build, draw, check |
