@@ -1,1 +1,53 @@
-{"@context":{"VSEKAI":"https://v-sekai.org/","domain":"VSEKAI:planning/domain/"},"@type":"domain:Plan","name":"cad_guest_ready_problem_plan","domain":"presence_edit","problem":"cad_guest_ready_problem","reached":true,"temporal":{"consistent":true,"origin":"2026-11-15T08:00:00Z","total":"PT0S"},"steps":[{"action":"solid-default","params":[],"start":"2026-11-15T08:00:00Z","end":"2026-11-15T08:00:00Z","duration":"PT0S"},{"action":"solid-box","params":[],"start":"2026-11-15T08:00:00Z","end":"2026-11-15T08:00:00Z","duration":"PT0S"},{"action":"solid-mesh","params":[],"start":"2026-11-15T08:00:00Z","end":"2026-11-15T08:00:00Z","duration":"PT0S"},{"action":"solid-script","params":[],"start":"2026-11-15T08:00:00Z","end":"2026-11-15T08:00:00Z","duration":"PT0S"},{"action":"solid-command-count","params":[],"start":"2026-11-15T08:00:00Z","end":"2026-11-15T08:00:00Z","duration":"PT0S"}]}
+{
+ "@context": {
+  "VSEKAI": "https://v-sekai.org/",
+  "domain": "VSEKAI:planning/domain/"
+ },
+ "@type": "domain:Plan",
+ "name": "cad_guest_ready_problem_plan",
+ "domain": "presence_edit",
+ "problem": "cad_guest_ready_problem",
+ "reached": true,
+ "temporal": {
+  "consistent": true,
+  "origin": "2026-11-15T08:00:00Z",
+  "total": "PT0S"
+ },
+ "steps": [
+  {
+   "action": "solid-default",
+   "params": [],
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:00Z",
+   "duration": "PT0S"
+  },
+  {
+   "action": "solid-box",
+   "params": [],
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:00Z",
+   "duration": "PT0S"
+  },
+  {
+   "action": "solid-mesh",
+   "params": [],
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:00Z",
+   "duration": "PT0S"
+  },
+  {
+   "action": "solid-script",
+   "params": [],
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:00Z",
+   "duration": "PT0S"
+  },
+  {
+   "action": "solid-command-count",
+   "params": [],
+   "start": "2026-11-15T08:00:00Z",
+   "end": "2026-11-15T08:00:00Z",
+   "duration": "PT0S"
+  }
+ ]
+}
