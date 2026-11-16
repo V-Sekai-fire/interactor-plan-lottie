@@ -162,7 +162,7 @@ def main (args : List String) : IO UInt32 := do
           { name := "GOLDEN the sequence reaches every node from the event, through the Extract nodes", ok := (unreached m (m.exec ++ m.expand)).isEmpty },
           { name := "CONTROL a missing exec wire leaves nodes unreached", ok := !(unreached m (m.exec.drop 3 ++ m.expand)).isEmpty },
           { name := "GOLDEN with no limit set, no Extract node is drawn", ok := m.expand.isEmpty },
-          { name := "INVARIANT at a cap of 30 no layer draws more than 30 nodes", ok := widest (model { c with cap := some 30 } dom plans) ≤ 30 },
+          { name := "INVARIANT at a cap one under the widest layer no layer draws more nodes than the cap", ok := widest (model { c with cap := some capN } dom plans) ≤ capN },
           { name := "CONTROL a layer over the cap is caught: with no limit a plan draws more nodes in one layer than a cap one under the widest layer", ok := widest m > capN },
           { name := "INVARIANT at a complexity limit of 10 no layer has more than 10 independent paths", ok := hardest (model { c with maxComplexity := some 10 } dom plans) ≤ 10 },
           { name := "CONTROL a layer of ten Branch nodes is over a complexity limit of 10", ok := complexity ({ order := (List.range 10).map fun i => s!"BR {i}" } : Laid) > 10 },

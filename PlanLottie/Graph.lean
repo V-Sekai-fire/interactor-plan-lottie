@@ -12,10 +12,9 @@ structure Cfg where
   grid : Float := 16
   /-- Hold each part on screen until its captions can be read. -/
   readPause : Bool := true
-  /-- The most nodes one layer holds, or none for no limit (the default). A plan over it is drawn as a layer of Extract nodes, each opening onto a layer of its own.
-  JPL's Power of Ten (rule 4) would give 30, the bound for a compound statement. -/
+  /-- The most nodes one layer holds, or none for no limit (the default). A plan over it is drawn as a layer of Extract nodes, each opening onto a layer of its own. -/
   cap : Option Nat := none
-  /-- The most independent paths through one layer (its Branch nodes plus one), or none for no limit (the default). NASA's SWE-220 allows 15 for safety-critical code and reads 10 or less as well structured. -/
+  /-- The most independent paths through one layer (its Branch nodes plus one), or none for no limit (the default). -/
   maxComplexity : Option Nat := none
 def Cfg.snap (c : Cfg) (v : Float) : Float := if c.grid > 0 then Float.round (v / c.grid) * c.grid else v
 def Cfg.nw (c : Cfg) : Float := if c.grid > 0 then 208 else 210

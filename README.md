@@ -19,7 +19,7 @@ The converter may hide what the JSON-LD says, but it may not add to it. The word
 
 ## Layers have no limit unless you set one
 
-By default a plan is one layer however many nodes it has. `--cap N` (nodes) and `--complexity N` (independent paths: the Branch nodes plus one) set a limit. A plan over it is drawn as a layer of Extract nodes. Each stands for a run of the plan's nodes and opens onto a layer of its own, and a Branch stays with its alternatives. NASA/JPL's rules for code that must not fail give numbers to start from, with a node standing for a statement: 30 nodes (Power of Ten, rule 4) and 10 paths (SWE-220 reads 10 or fewer as well structured). They are not built in.
+By default a plan is one layer however many nodes it has. `--cap N` (nodes) and `--complexity N` (independent paths: the Branch nodes plus one) set a limit. A plan over it is drawn as a layer of Extract nodes. Each stands for a run of the plan's nodes and opens onto a layer of its own, and a Branch stays with its alternatives.  No number is built in.
 
 ## Use it
 
