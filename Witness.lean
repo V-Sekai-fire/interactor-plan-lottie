@@ -147,6 +147,9 @@ def main (args : List String) : IO UInt32 := do
       let emptyPlan := J [("steps", A [])]
       let leakTexts := (textsOf (render c emptyDom [emptyPlan, emptyPlan])).filter (!chrome ·)
       let planted := textsOf (render c (setKey dom "name" (str "plain")) plans)
+      let described := (allSteps.filter fun k => ((actsOf dom).lookup k).any (·.description != "")).headD ""
+      let descLine := ((wrapLines (((actsOf dom).lookup described).map (·.description) |>.getD "") 44 3).headD "")
+      let undescribed := setKey dom "actions" (Json.mkObj ((entries (dom.getObjValD "actions")).map fun (k, a) => (k, if k == described then setKey a "description" (str "") else a)))
       let checks : List Check :=
         [ { name := "GOLDEN every step of every plan is a node", ok := allSteps.all (nodeNames doc).contains },
           { name := "CONTROL a step taken out of the plans is no longer drawn", ok := !hidden || allSteps.headD "" == "" },
@@ -187,7 +190,16 @@ def main (args : List String) : IO UInt32 := do
           { name := "LEAK from an empty domain and empty plans only the words of the drawing language are drawn", ok := leakTexts.isEmpty },
           { name := "LEAK with every string of the JSON-LD marked, every drawn word carries the mark", ok := (unmarked c dom plans).isEmpty },
           { name := "CONTROL a word the JSON-LD did not give is caught as unmarked", ok := !((["Fetch the clips"].filter fun t => !(t.any (· == '§')) && !chrome t).isEmpty) },
-          { name := "CONTROL a changed domain name reaches the drawing", ok := planted != textsOf doc } ]
+          { name := "CONTROL a changed domain name reaches the drawing", ok := planted != textsOf doc },
+          { name := "GOLDEN a time keeps its milliseconds: PT0.056S is 56 ms, PT3.202S is 3.202 s, PT21.45S is 21.45 s, PT1M7S is 1 min 7 s, PT30S is 30 s, PT0S is 0 s",
+            ok := (millis "PT0.056S").map span == some "56 ms" && (millis "PT3.202S").map span == some "3.202 s" && (millis "PT21.45S").map span == some "21.45 s"
+              && (millis "PT1M7S").map span == some "1 min 7 s" && (millis "PT30S").map span == some "30 s" && (millis "PT0S").map span == some "0 s" },
+          { name := "CONTROL a time that is not ISO 8601 with at most three decimals is not timed: PT0.5555S, 1.5 and a word",
+            ok := (millis "PT0.5555S").isNone && (millis "1.5").isNone && (millis "soon").isNone },
+          { name := "GOLDEN an action's description is drawn under its node, wrapped to the node's width",
+            ok := !described.isEmpty && !descLine.isEmpty && (textsOf doc).any (· == descLine) },
+          { name := "CONTROL with the description taken out of the domain, that line is no longer drawn",
+            ok := !((textsOf (render c undescribed plans)).any (· == descLine)) } ]
       for ch in checks do IO.println s!"  [{if ch.ok then "ok  " else "FAIL"}] {ch.name}"
       let bad := checks.filter (!·.ok)
       if bad.isEmpty then

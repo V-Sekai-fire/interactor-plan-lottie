@@ -17,11 +17,11 @@
 11. Fit anny. not timed. Sets fitted.
 12. Follow. not timed. Reads fitted from Fit anny, played from Play curve. Sets posed.
 13. Snapshot. not timed. Reads posed from Follow. Sets snapshot.
-14. Load qwen25vl conditioner. 4 s · GPU. Sets qwen25vl_conditioner, GPU.
-15. Load omnigen2 vae. 1 s · GPU. Reads GPU from Load qwen25vl conditioner. Sets omnigen2_vae, GPU.
-16. Load omnigen2 transformer. 4 s · GPU. Reads GPU from Load omnigen2 vae. Sets omnigen2_transformer, GPU.
-17. Load editscore lora. 1 s. Sets editscore_lora.
-18. Merge editscore lora. 1 s · GPU. Reads GPU from Load omnigen2 transformer, omnigen2_transformer from Load omnigen2 transformer, editscore_lora from Load editscore lora. Sets editscore_merged, GPU.
+14. Load qwen25vl conditioner. 3.202 s · GPU. Sets qwen25vl_conditioner, GPU.
+15. Load omnigen2 vae. 97 ms · GPU. Reads GPU from Load qwen25vl conditioner. Sets omnigen2_vae, GPU.
+16. Load omnigen2 transformer. 3.26 s · GPU. Reads GPU from Load omnigen2 vae. Sets omnigen2_transformer, GPU.
+17. Load editscore lora. 6 ms. Sets editscore_lora.
+18. Merge editscore lora. 174 ms · GPU. Reads GPU from Load omnigen2 transformer, omnigen2_transformer from Load omnigen2 transformer, editscore_lora from Load editscore lora. Sets editscore_merged, GPU.
 19. Edit. 1 min 7 s · GPU. Reads GPU from Merge editscore lora, snapshot from Snapshot, qwen25vl_conditioner from Load qwen25vl conditioner, omnigen2_transformer from Load omnigen2 transformer, omnigen2_vae from Load omnigen2 vae, editscore_merged from Merge editscore lora. Sets edited, GPU.
-20. Score. 22 s · GPU. Reads GPU from Edit, edited from Edit. Sets scored, GPU.
+20. Score. 21.45 s · GPU. Reads GPU from Edit, edited from Edit. Sets scored, GPU.
 

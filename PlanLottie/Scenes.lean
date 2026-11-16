@@ -16,16 +16,6 @@ def humanize (k : String) : String :=
 
 def lastSeg (p : String) : String := ((p.splitOn "/").getLast?).getD p
 
-/-- Words wrapped to lines of about `width` characters; text past `maxLines` is hidden behind an ellipsis. -/
-def wrapLines (text : String) (width maxLines : Nat) : List String :=
-  let words := (text.splitOn " ").filter (· != "")
-  let lines := words.foldl (fun (acc : List String) w =>
-    match acc.getLast? with
-    | some l => if l.length + 1 + w.length ≤ width then acc.dropLast ++ [l ++ " " ++ w] else acc ++ [w]
-    | none => [w]) []
-  if lines.length ≤ maxLines then lines
-  else lines.take (maxLines - 1) ++ [(lines.getD (maxLines - 1) "") ++ " …"]
-
 /-! ## The domain's alternatives -/
 
 structure Alt where

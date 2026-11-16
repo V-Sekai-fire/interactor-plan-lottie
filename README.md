@@ -8,6 +8,8 @@ JSON-LD in, Lottie out: the domain and one plan for each part go in, and one Lot
 - Coloured pins are facts. A step's inputs are on its left (facts it reads) and its outputs on its right (facts it sets).
 - A Branch node is a composite method with two or more alternatives. The way the plan took is lit, and the other is dim.
 - Every wire is solid. A dotted line is not a Blueprint thing.
+- Under a node, the action's own `description` from the domain, wrapped to the node's width. The domain marks each one in `description_basis`: written (the sentence its own description gives) or drafted (built from what the action reads and sets). The converter draws what the domain says and does not draft anything itself.
+- A step's time shows its milliseconds when it has them: `56 ms`, `3.202 s`, `1 min 7 s`.
 
 ## Layers have no limit unless you set one
 
@@ -45,7 +47,7 @@ To play it, serve this folder (`python3 -m http.server`) and open `/viewer.html`
 ## What it does not have
 
 - The plans are for desks that state every input as on hand. Today's desk cannot reach the edit, and the obstacle course repository has no `project.godot`, so on today's desk the planner calls it unreachable.
-- Times for most steps. Only the model loads, the edit and the score are timed, so the rest say "not timed".
+- Times for some steps. Only an action with a stated duration shows one; the rest say "not timed".
 - The relay's measured numbers and the tick rate. They are not in the domain, so they are not drawn.
 - A check in any player but lottie-web. The text is Arial, so a player without system fonts may letter it differently.
 

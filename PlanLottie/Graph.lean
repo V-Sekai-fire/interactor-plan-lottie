@@ -74,6 +74,8 @@ structure Act where
   sets : List String
   duration : Option String
   basis : String
+  /-- The action's own `description`, or empty when it has none. -/
+  description : String := ""
 
 def actsOf (dom : Json) : List (String × Act) :=
   (entries (dom.getObjValD "actions")).map fun (k, a) =>
@@ -81,29 +83,46 @@ def actsOf (dom : Json) : List (String × Act) :=
     (k, { reads := body.filterMap fun b => match b.getObjVal? "eval" with | .ok e => some (strOf (e.getObjValD "pointer")) | .error _ => none
         , sets := body.filterMap fun b => match b.getObjVal? "pointer/set" with | .ok p => some (strOf p) | .error _ => none
         , duration := match (a.getObjValD "duration").getStr? with | .ok s => some s | .error _ => none
-        , basis := strOf (a.getObjValD "duration_basis") })
+        , basis := strOf (a.getObjValD "duration_basis")
+        , description := strOf (a.getObjValD "description") })
 
-/-- Seconds of an ISO 8601 duration such as PT1H2M3S, or none when it is not one. -/
-def secs (iso : String) : Option Nat :=
+/-- Milliseconds of an ISO 8601 duration such as PT1H2M3S or PT0.056S, or none when it is not one. Only the seconds may carry a fraction, of at most three digits. -/
+def millis (iso : String) : Option Nat :=
   match iso.toList with
   | 'P' :: 'T' :: rest =>
-    let r := rest.foldl (fun (acc : Nat × Nat × Bool) c =>
-      let (tot, cur, ok) := acc
-      if c.isDigit then (tot, cur * 10 + (c.toNat - '0'.toNat), ok)
-      else if c == 'H' then (tot + cur * 3600, 0, ok)
-      else if c == 'M' then (tot + cur * 60, 0, ok)
-      else if c == 'S' then (tot + cur, 0, ok)
-      else (tot, cur, false)) (0, 0, true)
-    if r.2.2 then some r.1 else none
+    -- state: total ms, integer part, fraction in ms, digits of fraction seen (none while in the integer part), ok
+    let r := rest.foldl (fun (acc : Nat × Nat × Nat × Option Nat × Bool) c =>
+      let (tot, ip, fp, fd, ok) := acc
+      if c.isDigit then
+        let d := c.toNat - '0'.toNat
+        match fd with
+        | none => (tot, ip * 10 + d, fp, none, ok)
+        | some k => if k < 3 then (tot, ip, fp + d * (10 ^ (2 - k)), some (k + 1), ok) else (tot, ip, fp, some k, false)
+      else if c == '.' then (tot, ip, fp, some 0, ok && fd.isNone)
+      else if c == 'H' then (tot + ip * 3600000, 0, 0, none, ok && fd.isNone)
+      else if c == 'M' then (tot + ip * 60000, 0, 0, none, ok && fd.isNone)
+      else if c == 'S' then (tot + ip * 1000 + fp, 0, 0, none, ok)
+      else (tot, ip, fp, fd, false)) (0, 0, 0, none, true)
+    if r.2.2.2.2 then some r.1 else none
   | _ => none
 
-def span (s : Nat) : String :=
-  if s < 60 then s!"{s} s" else s!"{s / 60} min" ++ (if s % 60 != 0 then s!" {s % 60} s" else "")
+/-- Three-digit milliseconds without trailing zeros: 56 is "056", 200 is "2". -/
+def fracDigits (f : Nat) : String :=
+  let t := (if f < 10 then "00" else if f < 100 then "0" else "") ++ toString f
+  String.mk (t.toList.reverse.dropWhile (· == '0')).reverse
+
+/-- A time for a node: "56 ms", "3.202 s", "21.45 s", "1 min 7 s". A whole number of seconds prints as it always did. -/
+def span (t : Nat) : String :=
+  let secsPart := fun (m : Nat) => toString (m / 1000) ++ (if m % 1000 == 0 then "" else "." ++ fracDigits (m % 1000)) ++ " s"
+  if t == 0 then "0 s"
+  else if t < 1000 then s!"{t} ms"
+  else if t < 60000 then secsPart t
+  else s!"{t / 60000} min" ++ (if t % 60000 != 0 then " " ++ secsPart (t % 60000) else "")
 
 def timing (acts : List (String × Act)) (a : String) : String :=
   match acts.lookup a with
   | none => "not timed"
-  | some act => match act.duration.bind secs with
+  | some act => match act.duration.bind millis with
     | none => "not timed"
     | some d => span d ++ (if act.basis.startsWith "estimate" then " est." else "")
 
@@ -123,6 +142,8 @@ structure Node where
   outs : List (String × String) := []
   execIn : Bool := true
   execOuts : List String := [""]
+  /-- The action's own description, drawn under the node. -/
+  desc : String := ""
   desk : Nat := 0
   dim : Bool := false
 
@@ -135,6 +156,16 @@ def Node.execInPos (n : Node) : Float × Float := (n.x + 12, n.y + n.head + 18)
 def Node.execOutPos (c : Cfg) (n : Node) (i : Nat) : Float × Float := (n.x + c.nw - 12, n.y + n.head + 18 + 20 * i.toFloat)
 def Node.pinIn (n : Node) (k : String) : Float × Float := (n.x + 12, n.y0 + 10 + ((n.ins.findIdx? (·.1 == k)).getD 0).toFloat * 20)
 def Node.pinOut (c : Cfg) (n : Node) (k : String) : Float × Float := (n.x + c.nw - 12, n.y0 + 10 + ((n.outs.findIdx? (·.1 == k)).getD 0).toFloat * 20)
+
+/-- Words wrapped to lines of about `width` characters; text past `maxLines` is hidden behind an ellipsis. -/
+def wrapLines (text : String) (width maxLines : Nat) : List String :=
+  let words := (text.splitOn " ").filter (· != "")
+  let lines := words.foldl (fun (acc : List String) w =>
+    match acc.getLast? with
+    | some l => if l.length + 1 + w.length ≤ width then acc.dropLast ++ [l ++ " " ++ w] else acc ++ [w]
+    | none => [w]) []
+  if lines.length ≤ maxLines then lines
+  else lines.take (maxLines - 1) ++ [(lines.getD (maxLines - 1) "") ++ " …"]
 
 /-- The layers of one node. `lit` is the frame it runs at, none for a node that is shown but not run. -/
 def Node.draw (c : Cfg) (t0 : Float) (n : Node) (wiredIn wiredOut : List String) (lit : Option Float) (execInWired : Bool) (execOutWired : List Bool) : List Json :=
@@ -161,6 +192,7 @@ def Node.draw (c : Cfg) (t0 : Float) (n : Node) (wiredIn wiredOut : List String)
     ++ n.ins.map (fun (k, _) => let p := n.pinIn k; text t0 (p.1 + 12) (p.2 + 4) (pinLabel k) 12 TXT s!"in {n.key} {k}" 0 fo)
     ++ n.outs.map (fun (k, _) => let p := n.pinOut c k; text t0 (p.1 - 12) (p.2 + 4) (pinLabel k) 12 TXT s!"out {n.key} {k}" 1 fo)
     ++ (if n.desk > 0 then [text t0 (n.x + 12) (n.y + h - 10) s!"+ {n.desk} stated by the desk" 11 SUB s!"desk {n.key}" 0 fo] else [])
+    ++ (((wrapLines n.desc 44 3).zip (List.range 3)).map fun (ln, i) => text t0 (n.x + 4) (n.y + h + 18 + 14 * i.toFloat) ln 11 SUB s!"ndesc {n.key} {i}" 0 fo)
   [body] ++ flash ++ texts
 
 /-! ## Scenes -/
@@ -293,7 +325,7 @@ def buildNodes (c : Cfg) (acts : List (String × Act)) (alts : String → List S
       let outs := (act.sets.filter fun f => edges.any fun (s, g, _, _, _) => s == sp.key && g == f).map fun f => (f, pinType f)
       let desk := (dedup act.reads).filter (fun f => !wr.contains f) |>.length
       let sub := (if sp.tool.isEmpty then "" else sp.tool ++ " · ") ++ timing acts sp.key ++ (if act.reads.contains "/input/gpu" then " · GPU" else "")
-      { key := sp.key, title := sp.title, sub, kind := sp.kind, x := c.col sp.col, y := c.snap sp.y, ins, outs, execOuts := sp.execOuts, desk, dim := sp.dim }
+      { key := sp.key, title := sp.title, sub, kind := sp.kind, x := c.col sp.col, y := c.snap sp.y, ins, outs, execOuts := sp.execOuts, desk, dim := sp.dim, desc := act.description }
     | none => { key := sp.key, title := sp.title, sub := sp.sub, kind := sp.kind, x := c.col sp.col, y := c.snap sp.y, ins := sp.ins, outs := sp.outs, execIn := sp.execIn, execOuts := sp.execOuts, dim := sp.dim }
   (nodes, edges)
 
