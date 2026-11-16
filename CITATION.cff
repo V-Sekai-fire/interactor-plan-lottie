@@ -9,5 +9,5 @@ authors:
     orcid: https://orcid.org/0000-0001-7772-8085
 repository-code: https://github.com/V-Sekai-fire/interactor-plan-lottie
 abstract: >-
-  A Lottie animation of the poseswap planning domain as a railroad diagram, and the script that draws it from the domain's own
-  reads and sets and from the planner's plan: the presence slice, the zone relay's loop, and the AUX route.
+  A Lean 4 converter from a planner's JSON-LD domain and plan to a Lottie animation drawn like Unreal Engine Blueprints, with
+  nine example plans.

@@ -37,9 +37,9 @@
 // A file:// page cannot fetch the JSON: serve the folder (python3 -m http.server) and open /viewer.html.
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = id => document.getElementById(id);
-// ?plan=0-presence | 1-relay | 2-aux | 3-course | 4-guests | 5-aux-today | 6-snapshot | 7-gates | 8-cad plays one plan from lottie/; no parameter plays the first four together.
+// ?plan=0-presence | 1-relay | 2-aux | 3-course | 4-guests | 5-aux-today | 6-snapshot | 7-gates | 8-cad plays one plan from lottie/; no parameter plays all (the first four together).
 const plan = new URLSearchParams(location.search).get("plan");
-const base = plan && /^[0-9]+-[a-z0-9-]+$/.test(plan) ? "lottie/" + plan : "poseswap-plan";
+const base = plan && /^[0-9]+-[a-z0-9-]+$/.test(plan) ? "lottie/" + plan : "lottie/all";
 fetch(base + ".transcript.md").then(r => r.text()).then(t => { $("words").textContent = t; });
 fetch(base + ".lottie.json").then(r => r.json()).then(data => {
   if (data.nm) { $("h").textContent = data.nm; document.title = data.nm; }
