@@ -38,8 +38,8 @@ One Sequence node runs a part for each plan given. To play a result, serve this 
 | `Witness.lean` | the checks (golden, control, invariant and leak), each with a planted fault where it can fail |
 | `inputs/domain.jsonld` | the planning domain the plans come from |
 | `inputs/plans/` | the plans the planner made from it, named `<n>-<name>.jsonld` |
-| `lottie/` | each plan as a Lottie with its text version, and `all`, the plans numbered 0 to 3 together |
-| `tests/golden/` | the committed text versions the checks compare against |
+| `lottie/<n>-<name>/` | each plan as `lottie.json` with its text version `transcript.md`, and `all/`, the plans numbered 0 to 3 together |
+| `tests/golden/<n>-<name>/transcript.md` | the committed text versions the checks compare against |
 | `viewer.html` | the player |
 | `make.sh` | build, draw, check |
 
@@ -47,7 +47,7 @@ The domain and the plans are the examples. They describe a character-editing pip
 
 ## Change a plan
 
-Plan again with your planner, put the domain at `inputs/domain.jsonld` and the plan at `inputs/plans/<n>-<name>.jsonld`, and run `./make.sh`. The new plan has no golden yet, so copy `lottie/<n>-<name>.transcript.md` to `tests/golden/` once you have read it and mean it. For a change to an existing plan, copy the new text version over its golden the same way.
+Plan again with your planner, put the domain at `inputs/domain.jsonld` and the plan at `inputs/plans/<n>-<name>.jsonld`, and run `./make.sh`. The new plan has no golden yet, so copy `lottie/<n>-<name>/transcript.md` to `tests/golden/<n>-<name>/` once you have read it and mean it. For a change to an existing plan, copy the new text version over its golden the same way.
 
 ## What it does not have
 

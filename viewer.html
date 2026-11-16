@@ -39,9 +39,9 @@ const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = id => document.getElementById(id);
 // ?plan=<n>-<name> plays that plan from lottie/; no parameter plays lottie/all.
 const plan = new URLSearchParams(location.search).get("plan");
-const base = plan && /^[0-9]+-[a-z0-9-]+$/.test(plan) ? "lottie/" + plan : "lottie/all";
-fetch(base + ".transcript.md").then(r => r.text()).then(t => { $("words").textContent = t; });
-fetch(base + ".lottie.json").then(r => r.json()).then(data => {
+const base = plan && /^[0-9]+-[a-z0-9-]+$/.test(plan) ? "lottie/" + plan + "/" : "lottie/all/";
+fetch(base + "transcript.md").then(r => r.text()).then(t => { $("words").textContent = t; });
+fetch(base + "lottie.json").then(r => r.json()).then(data => {
   if (data.nm) { $("h").textContent = data.nm; document.title = data.nm; }
   const anim = lottie.loadAnimation({ container: $("stage"), renderer: "svg", loop: false, autoplay: !reduce, animationData: data });
   const marks = data.markers.map(m => ({ t: m.tm, name: m.cm })).sort((a, b) => a.t - b.t);
