@@ -79,7 +79,7 @@ def kindOfVar : String → String
   | "body" => "body" | "avatar" => "avatar" | "image" => "edit" | "model" => "model" | "op" => "edit"
   | "aux" => "labels" | "course" => "motion" | "relay" => "hair" | _ => "body"
 
-/-- Lay out items in a row. `prevs` are the exec outputs that lead to the first item: none for a layer that is entered from an Extract node. -/
+/-- Lay out items in a row. `prevs` are the exec outputs that lead to the first item: none for a layer that nothing enters. -/
 def layItems (kindOf : String → String) (row : Float) (its : List Item) (prevs : List (String × Nat)) : Laid :=
   let init : LayState := { prevs }
   let done := its.foldl (fun (st : LayState) it =>
@@ -106,20 +106,6 @@ def layItems (kindOf : String → String) (row : Float) (its : List Item) (prevs
 def itemSize : Item → Nat
   | .single _ => 1
   | .branch g _ => 1 + (g.alts.flatMap (·.prims)).length
-
-def itemBranches : Item → Nat
-  | .single _ => 0
-  | .branch _ _ => 1
-
-/-- Items in order, cut into runs that each draw at most `cap` nodes and hold at most `maxBranches` Branch nodes. An item is never cut, so a Branch stays with its alternatives. -/
-def chunkItems (cap maxBranches : Nat) (its : List Item) : List (List Item) :=
-  let r := its.foldl (fun (acc : List (List Item) × Nat × Nat) it =>
-    let n := itemSize it
-    let b := itemBranches it
-    match acc.1.getLast? with
-    | some cur => if acc.2.1 + n ≤ cap && acc.2.2 + b ≤ maxBranches then (acc.1.dropLast ++ [cur ++ [it]], acc.2.1 + n, acc.2.2 + b) else (acc.1 ++ [[it]], n, b)
-    | none => ([[it]], n, b)) ([], 0, 0)
-  r.1
 
 def stepsOfItem : Item → List String
   | .single k => [k]
@@ -149,56 +135,34 @@ structure PartInfo where
   laid : Laid
   row : Float
   caption : List String
-  /-- How the part's title begins: "Then N. " for a plan, "Inside " for the layer an Extract node opens. -/
+  /-- How the part's title begins: "Then N. ". -/
   lead : String
   /-- The first and last step the part covers, for its title. -/
   span : String × String
-  /-- The Extract nodes in this part, each with the first node of the layer it opens. Not drawn as wires: the layer is the inside of the node. -/
-  expand : List ExecEdge := []
-
+  
 structure Model where
   nodes : List Node
   dataEdges : List DataEdge
   exec : List ExecEdge
   order : List String
   parts : List PartInfo
-  expand : List ExecEdge
   maxCol : Nat
 
 def rowOf (i : Nat) : Float := 20 + 600 * i.toFloat
 
-/-- Independent paths through a layer: each Branch node is one more. -/
-def complexity (l : Laid) : Nat := (l.order.filter (·.startsWith "BR ")).length + 1
-
 def lastKey (l : Laid) : String := (l.order.getLast?).getD l.first
 
-/-- One plan as parts. A plan within the limits, or with none set, is one layer. A longer one is a layer of Extract nodes, then one layer for each Extract node. -/
-def partsOfPlan (c : Cfg) (dom : Json) (acts : List (String × Act)) (groups : List Group) (kindOf : String → String) (i : Nat) (plan : Json) (slot : Nat) : List PartInfo :=
+/-- One plan as one layer of its own. -/
+def partsOfPlan (dom : Json) (acts : List (String × Act)) (groups : List Group) (kindOf : String → String) (i : Nat) (plan : Json) (slot : Nat) : List PartInfo :=
   let steps := plannedOf plan
-  let its := itemsOf groups steps
-  let whole := layItems kindOf (rowOf slot) its [("SEQ", i)]
-  if (c.cap.all (whole.order.length ≤ ·)) && (c.maxComplexity.all (complexity whole ≤ ·)) then
-    [{ steps, laid := whole, row := rowOf slot, caption := captionOf dom acts steps, lead := s!"Then {i}. ", span := (whole.first, lastKey whole) }]
-  else
-    let chunks := chunkItems (c.cap.getD whole.order.length) ((c.maxComplexity.getD (its.length + 1)) - 1) its
-    let inner := chunks.zip (List.range chunks.length) |>.map fun (ch, j) =>
-      let laid := layItems kindOf (rowOf (slot + 1 + j)) ch []
-      let st := ch.flatMap stepsOfItem
-      ({ steps := st, laid, row := rowOf (slot + 1 + j), caption := captionOf dom acts st, lead := "Inside ", span := (laid.first, lastKey laid) } : PartInfo)
-    let exKey := fun (j : Nat) => s!"EX {i} {j}"
-    let specs : List Spec := (inner.zip (List.range inner.length)).map fun (p, j) =>
-      { key := exKey j, title := ((p.laid.specs.head?).map (·.title)).getD "", kind := "extract", col := 2 + j, y := rowOf slot,
-        sub := s!"Extract · {p.laid.order.length} nodes" }
-    let order := (List.range inner.length).map exKey
-    let top : Laid := { specs, order, exec := [("SEQ", i, exKey 0)] ++ chain order, first := exKey 0 }
-    { steps, laid := top, row := rowOf slot, caption := captionOf dom acts steps, lead := s!"Then {i}. ", span := (whole.first, lastKey whole),
-      expand := (inner.zip (List.range inner.length)).map fun (p, j) => (exKey j, 0, p.laid.first) } :: inner
+  let whole := layItems kindOf (rowOf slot) (itemsOf groups steps) [("SEQ", i)]
+  [{ steps, laid := whole, row := rowOf slot, caption := captionOf dom acts steps, lead := s!"Then {i}. ", span := (whole.first, lastKey whole) }]
 
 def model (c : Cfg) (dom : Json) (plans : List Json) : Model :=
   let acts := actsOf dom
   let groups := groupsOf dom
   let kindOf := fun (k : String) => match (acts.lookup k).bind (·.sets.head?) with | some p => kindOfVar (pinType p) | none => "body"
-  let parts := (plans.zip (List.range plans.length)).foldl (fun (acc : List PartInfo) (p, i) => acc ++ partsOfPlan c dom acts groups kindOf i p acc.length) []
+  let parts := (plans.zip (List.range plans.length)).foldl (fun (acc : List PartInfo) (p, i) => acc ++ partsOfPlan dom acts groups kindOf i p acc.length) []
   let head : List Spec :=
     [{ key := "RUN", title := strOf (dom.getObjValD "name"), kind := "event", col := 0, y := rowOf 0, execIn := false },
      { key := "SEQ", title := "Sequence", kind := "branch", col := 1, y := rowOf 0, execOuts := (List.range plans.length).map fun i => s!"Then {i}" }]
@@ -206,7 +170,6 @@ def model (c : Cfg) (dom : Json) (plans : List Json) : Model :=
   let orderAll := parts.flatMap (·.laid.order)
   let (nodes, dataEdges) := buildNodes c acts (altsOf groups) specs orderAll
   { nodes, dataEdges, exec := [("RUN", 0, "SEQ")] ++ parts.flatMap (·.laid.exec), order := ["RUN", "SEQ"] ++ orderAll, parts,
-    expand := parts.flatMap (·.expand),
     maxCol := specs.foldl (fun m sp => max m sp.col) 2 }
 
 def fixedNames : List String := ["background", "grid fine v", "grid fine h", "grid bold v", "grid bold h", "title strip", "caption strip", "title", "subtitle"]

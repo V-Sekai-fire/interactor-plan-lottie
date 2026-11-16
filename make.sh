@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
-# Build the converter, draw the plans in inputs/ as one Lottie and its text version, and each plan as a Lottie of its own in lottie/, then run the checks.
-# A layer has no node limit unless --cap N or --complexity N is passed (README); a plan over a limit becomes a layer of Extract nodes, each opening onto a layer of its own.
-# The committed golden is tests/golden/transcript.md: after a change you mean to make, copy poseswap-plan.transcript.md over it.
-# To redraw from a changed domain, copy the domain and the planner's plans into inputs/ first (see README).
+# Build the converter, draw every plan in inputs/plans/ as a Lottie of its own and the plans numbered 0 to 3 together as lottie/all, then run the checks.
+# Each plan has a golden text version in tests/golden/<n>.transcript.md, and the combined one is tests/golden/all.transcript.md.
+# After a change you mean to make, copy lottie/<n>.transcript.md over its golden.
 set -euo pipefail
 cd "$(dirname "$0")"
 lake build plan_lottie plan_lottie_witness
-PLANS=(inputs/plan-*.jsonld)
-.lake/build/bin/plan_lottie --transcript poseswap-plan.transcript.md inputs/domain.jsonld poseswap-plan.lottie.json "${PLANS[@]}"
+BIN=.lake/build/bin
+DOM=inputs/domain.jsonld
 mkdir -p lottie
-for p in "${PLANS[@]}"; do n=$(basename "$p" .jsonld); n=${n#plan-}; .lake/build/bin/plan_lottie --transcript "lottie/$n.transcript.md" inputs/domain.jsonld "lottie/$n.lottie.json" "$p"; done
-# The workflows the desks can do, each drawn and checked on its own (inputs/workflows/); they are not part of the combined Lottie or its golden.
-# Each has its own golden transcript in tests/golden/workflows/: after a change you mean to make, copy lottie/<n>.transcript.md over it.
-for p in inputs/workflows/plan-*.jsonld; do
-  n=$(basename "$p" .jsonld); n=${n#plan-}
-  .lake/build/bin/plan_lottie --transcript "lottie/$n.transcript.md" inputs/domain.jsonld "lottie/$n.lottie.json" "$p"
-  .lake/build/bin/plan_lottie_witness inputs/domain.jsonld "tests/golden/workflows/$n.transcript.md" "$p"
+for p in inputs/plans/*.jsonld; do
+  n=$(basename "$p" .jsonld)
+  $BIN/plan_lottie --transcript "lottie/$n.transcript.md" $DOM "lottie/$n.lottie.json" "$p"
+  $BIN/plan_lottie_witness $DOM "tests/golden/$n.transcript.md" "$p"
 done
-.lake/build/bin/plan_lottie_witness inputs/domain.jsonld tests/golden/transcript.md "${PLANS[@]}"
+CORE=(inputs/plans/[0-3]-*.jsonld)
+$BIN/plan_lottie --transcript lottie/all.transcript.md $DOM lottie/all.lottie.json "${CORE[@]}"
+$BIN/plan_lottie_witness $DOM tests/golden/all.transcript.md "${CORE[@]}"
