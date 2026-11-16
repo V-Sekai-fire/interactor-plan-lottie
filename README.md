@@ -32,8 +32,8 @@ The converter may hide what the JSON-LD says, but it may not add to it. A node i
 | `inputs/` | the poseswap domain and the planner's four plans: the presence slice, one relay tick, the AUX route and the obstacle course |
 | `poseswap-plan.lottie.json`, `poseswap-plan.transcript.md` | the animation, and the same graph as text |
 | `tests/golden/transcript.md` | the committed text version that the check compares against |
-| `lottie/` | each plan as a Lottie of its own, with its text version (`viewer.html?plan=0-presence`, `1-relay`, `2-aux`, `3-course`), and the workflows below (`4-guests`, `5-aux-today`, `6-snapshot`, `7-gates`) |
-| `inputs/workflows/` | the planner's plans for four more workflows the desks can do: every guest ELF run in turn (12 steps), the AUX route on today's desk (14), the snapshot of the playback (9) and the Mac's presence gates (7). Each is drawn and checked on its own, with its golden in `tests/golden/workflows/` |
+| `lottie/` | each plan as a Lottie of its own, with its text version (`viewer.html?plan=0-presence`, `1-relay`, `2-aux`, `3-course`), and the workflows below (`4-guests`, `5-aux-today`, `6-snapshot`, `7-gates`, `8-cad`) |
+| `inputs/workflows/` | the planner's plans for five more workflows the desks can do: every guest ELF run in turn (12 steps), the AUX route on today's desk (14), the snapshot of the playback (9) and the Mac's presence gates (7) and the five functions of the SolidCraft CAD guest (5). Each is drawn and checked on its own, with its golden in `tests/golden/workflows/` |
 | `viewer.html` | a page that plays it, with Pause, Restart, speed, a status line, and the text version below |
 | `make.sh` | build, draw, check |
 

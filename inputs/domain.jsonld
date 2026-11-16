@@ -109,6 +109,18 @@
    "type": "int",
    "description": "1 when the guest ELF of that name has run its stage: usd, udim_unpack, remesh, cage, drape, cloth_fit, garment_fit, headfit, skintokens, skintokens_rig, pixal3d, seethrough.",
    "init": {}
+  },
+  {
+   "name": "cad_input",
+   "type": "int",
+   "description": "1 when what the CAD guest needs is on hand: the SolidCraft engine checkout (solidcraft_engine), the guest repository (guest_repo) and solidcraft-guest.elf built (guest_elf).",
+   "init": {}
+  },
+  {
+   "name": "cad",
+   "type": "int",
+   "description": "1 when the CAD guest function of that name has run: solid_default, solid_box, solid_mesh, solid_script, solid_command_count.",
+   "init": {}
   }
  ],
  "actions": {
@@ -2468,6 +2480,171 @@
    "description": "See-Through (anime illustration -> inpainted semantic layers + depth) as a godot-sandbox guest ELF whose ggml graph runs on ggml-rd.",
    "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-seethrough-guest, read 2026-11-15",
    "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "solid-default": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/solidcraft_engine",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/cad/solid_default",
+     "value": 1
+    }
+   ],
+   "description": "SolidCraft.solid_default() -> Array: 10x20x30 mm box, canonical example.",
+   "description_basis": "written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15",
+   "duration_basis": "not timed: no call of this function has been timed here"
+  },
+  "solid-box": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/solidcraft_engine",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/cad/solid_box",
+     "value": 1
+    }
+   ],
+   "description": "SolidCraft.solid_box(float length, float width, float height) -> Array: parameterised box, mm.",
+   "description_basis": "written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15",
+   "duration_basis": "not timed: no call of this function has been timed here"
+  },
+  "solid-mesh": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/solidcraft_engine",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/cad/solid_mesh",
+     "value": 1
+    }
+   ],
+   "description": "SolidCraft.solid_mesh(int kind, float a, float b, float c) -> Array: [ok, tris, positions, normals, indices].",
+   "description_basis": "written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15",
+   "duration_basis": "not timed: no call of this function has been timed here"
+  },
+  "solid-script": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/solidcraft_engine",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/cad/solid_script",
+     "value": 1
+    }
+   ],
+   "description": "SolidCraft.solid_script(String script) -> Array: [ok, message, [[name, tris, positions, normals, indices], ...]].",
+   "description_basis": "written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15",
+   "duration_basis": "not timed: no call of this function has been timed here"
+  },
+  "solid-command-count": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/solidcraft_engine",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/cad_input/guest_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/cad/solid_command_count",
+     "value": 1
+    }
+   ],
+   "description": "SolidCraft.solid_command_count() -> int: engine command-spec count.",
+   "description_basis": "written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15",
+   "duration_basis": "not timed: no call of this function has been timed here"
   }
  },
  "methods": {
@@ -3522,6 +3699,66 @@
      "subtasks": [
       [
        "run-seethrough-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/cad/solid_default": {
+   "alternatives": [
+    {
+     "name": "call",
+     "subtasks": [
+      [
+       "solid-default"
+      ]
+     ]
+    }
+   ]
+  },
+  "/cad/solid_box": {
+   "alternatives": [
+    {
+     "name": "call",
+     "subtasks": [
+      [
+       "solid-box"
+      ]
+     ]
+    }
+   ]
+  },
+  "/cad/solid_mesh": {
+   "alternatives": [
+    {
+     "name": "call",
+     "subtasks": [
+      [
+       "solid-mesh"
+      ]
+     ]
+    }
+   ]
+  },
+  "/cad/solid_script": {
+   "alternatives": [
+    {
+     "name": "call",
+     "subtasks": [
+      [
+       "solid-script"
+      ]
+     ]
+    }
+   ]
+  },
+  "/cad/solid_command_count": {
+   "alternatives": [
+    {
+     "name": "call",
+     "subtasks": [
+      [
+       "solid-command-count"
       ]
      ]
     }
