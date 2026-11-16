@@ -150,6 +150,7 @@ def main (args : List String) : IO UInt32 := do
       let described := (allSteps.filter fun k => ((actsOf dom).lookup k).any (·.description != "")).headD ""
       let descLine := ((wrapLines (((actsOf dom).lookup described).map (·.description) |>.getD "") 44 3).headD "")
       let undescribed := setKey dom "actions" (Json.mkObj ((entries (dom.getObjValD "actions")).map fun (k, a) => (k, if k == described then setKey a "description" (str "") else a)))
+      let oneStep := (plans.take 1).map fun p => setKey p "steps" (A ((items (p.getObjValD "steps")).take 1))
       let checks : List Check :=
         [ { name := "GOLDEN every step of every plan is a node", ok := allSteps.all (nodeNames doc).contains },
           { name := "CONTROL a step taken out of the plans is no longer drawn", ok := !hidden || allSteps.headD "" == "" },
@@ -176,7 +177,8 @@ def main (args : List String) : IO UInt32 := do
           { name := "INVARIANT every sub-line fits inside a node (34 characters)", ok := subsFit m },
           { name := "CONTROL a sub-line that is too long is caught", ok := !subsFit { m with nodes := longSub :: m.nodes } },
           { name := "INVARIANT each part stays on screen as long as its caption takes to read", ok := readable c dom plans },
-          { name := "CONTROL without the reading pauses the captions are too short", ok := !readable { c with readPause := false } dom plans },
+          { name := "CONTROL without the reading pauses a part of one node is on screen too short a time for its caption", ok := !readable { c with readPause := false } dom oneStep },
+          { name := "CONTROL with the reading pauses that same part of one node is held long enough", ok := readable c dom oneStep },
           { name := "INVARIANT shape colours are animatable properties", ok := coloursOk doc },
           { name := "CONTROL a bare-array colour is caught", ok := coloursOk goodColour && !coloursOk badColour },
           { name := "INVARIANT no wire is dotted: alternatives are Branch nodes", ok := noDashes doc },

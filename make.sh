@@ -10,4 +10,11 @@ PLANS=(inputs/plan-*.jsonld)
 .lake/build/bin/plan_lottie --transcript poseswap-plan.transcript.md inputs/domain.jsonld poseswap-plan.lottie.json "${PLANS[@]}"
 mkdir -p lottie
 for p in "${PLANS[@]}"; do n=$(basename "$p" .jsonld); n=${n#plan-}; .lake/build/bin/plan_lottie --transcript "lottie/$n.transcript.md" inputs/domain.jsonld "lottie/$n.lottie.json" "$p"; done
+# The workflows the desks can do, each drawn and checked on its own (inputs/workflows/); they are not part of the combined Lottie or its golden.
+# Each has its own golden transcript in tests/golden/workflows/: after a change you mean to make, copy lottie/<n>.transcript.md over it.
+for p in inputs/workflows/plan-*.jsonld; do
+  n=$(basename "$p" .jsonld); n=${n#plan-}
+  .lake/build/bin/plan_lottie --transcript "lottie/$n.transcript.md" inputs/domain.jsonld "lottie/$n.lottie.json" "$p"
+  .lake/build/bin/plan_lottie_witness inputs/domain.jsonld "tests/golden/workflows/$n.transcript.md" "$p"
+done
 .lake/build/bin/plan_lottie_witness inputs/domain.jsonld tests/golden/transcript.md "${PLANS[@]}"

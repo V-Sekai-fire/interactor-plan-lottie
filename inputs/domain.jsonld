@@ -97,6 +97,18 @@
    "type": "int",
    "description": "1 when a step of one relay tick is done: datagrams, person, offered, handled, ticked, caught_up, next_tick.",
    "init": {}
+  },
+  {
+   "name": "guest_input",
+   "type": "int",
+   "description": "1 when a guest of the sandbox is ready to run: its repository is checked out (<name>_repo) or its ELF is built (<name>_elf), for usd, udim_unpack, remesh, cage, drape, cloth_fit, garment_fit, headfit, skintokens, skintokens_rig, pixal3d, seethrough.",
+   "init": {}
+  },
+  {
+   "name": "guest",
+   "type": "int",
+   "description": "1 when the guest ELF of that name has run its stage: usd, udim_unpack, remesh, cage, drape, cloth_fit, garment_fit, headfit, skintokens, skintokens_rig, pixal3d, seethrough.",
+   "init": {}
   }
  ],
  "actions": {
@@ -2089,6 +2101,373 @@
    "duration_basis": "not timed here; docs/zone-net.md measures the loop on loopback only",
    "description": "Needs caught up. Makes next tick.",
    "description_basis": "drafted from the action's own preconditions and effects; no other source"
+  },
+  "run-usd-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/usd_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/usd_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/usd",
+     "value": 1
+    }
+   ],
+   "description": "OpenUSD compiled into a RISC-V sandbox guest that opens a stage from bytes, with the probe guest that first proved it could.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-usd-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-udim-unpack-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/udim_unpack_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/udim_unpack_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/udim_unpack",
+     "value": 1
+    }
+   ],
+   "description": "udim.elf unpacks UDIM tiles inside a godot-sandbox guest.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-udim-unpack-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-remesh-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/remesh_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/remesh_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/remesh",
+     "value": 1
+    }
+   ],
+   "description": "A remesher, simplifier and level-of-detail builder for avatar meshes that runs as a sandbox guest and works on flat arrays.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-remesh-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-cage-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/cage_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/cage_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/cage",
+     "value": 1
+    }
+   ],
+   "description": "The cage stage as a godot-sandbox guest: the (1,3) biharmonic bind and the in-motion cage fit on L-BFGS-B.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-cage-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-drape-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/drape_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/drape_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/drape",
+     "value": 1
+    }
+   ],
+   "description": "The drape stage as a godot-sandbox guest: AVBD cloth from Lean kernels, run on the CPU and on RenderingDevice.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-drape-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-cloth-fit-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/cloth_fit_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/cloth_fit_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/cloth_fit",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "description": "The cloth-fit stage as a godot-sandbox guest whose compute runs on the GPU: a garment is retargeted onto a new body without intersections.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-cloth-fit-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-garment-fit-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/garment_fit_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/garment_fit_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/garment_fit",
+     "value": 1
+    }
+   ],
+   "description": "The garment fit stage as a godot-sandbox guest: an intersection-free retargeting solve with a signed-distance sampler emitted from Lean.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-garment-fit-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-headfit-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/headfit_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/headfit_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/headfit",
+     "value": 1
+    }
+   ],
+   "description": "The head fit as a sandboxed guest program: it fits the parametric body model's head and transfers a shared facial-expression set onto it.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-headfit-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-skintokens-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/skintokens_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/skintokens_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/skintokens",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "description": "SkinTokens auto-rigging on ggml-rd, built as a sandboxed guest program.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-skintokens-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-skintokens-rig-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/skintokens_rig_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/skintokens_rig_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/skintokens_rig",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "description": "A small Godot 4 project that runs the SkinTokens rig guest, skintokens.elf, on Godot's RenderingDevice.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-skintokens-rig-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-pixal3d-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/pixal3d_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/pixal3d_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/pixal3d",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "description": "Pixal3D (image to 3D, a TRELLIS.2 pipeline) as a godot-sandbox guest ELF whose ggml graph runs on ggml-rd.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-pixal3d-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
+  },
+  "run-seethrough-guest": {
+   "params": [],
+   "body": [
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/input/gpu",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/seethrough_repo",
+      "value": 1
+     }
+    },
+    {
+     "eval": {
+      "type": "pointer/ge",
+      "pointer": "/guest_input/seethrough_elf",
+      "value": 1
+     }
+    },
+    {
+     "pointer/set": "/guest/seethrough",
+     "value": 1
+    },
+    {
+     "pointer/set": "/input/gpu",
+     "value": 1
+    }
+   ],
+   "description": "See-Through (anime illustration -> inpainted semantic layers + depth) as a godot-sandbox guest ELF whose ggml graph runs on ggml-rd.",
+   "description_basis": "written: the first sentence of the README of V-Sekai-fire/interactor-seethrough-guest, read 2026-11-15",
+   "duration_basis": "not timed: no run of this guest has been timed here"
   }
  },
  "methods": {
@@ -2999,6 +3378,150 @@
       ],
       [
        "wait-for-next-tick"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/usd": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-usd-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/udim_unpack": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-udim-unpack-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/remesh": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-remesh-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/cage": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-cage-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/drape": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-drape-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/cloth_fit": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-cloth-fit-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/garment_fit": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-garment-fit-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/headfit": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-headfit-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/skintokens": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-skintokens-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/skintokens_rig": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-skintokens-rig-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/pixal3d": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-pixal3d-guest"
+      ]
+     ]
+    }
+   ]
+  },
+  "/guest/seethrough": {
+   "alternatives": [
+    {
+     "name": "run",
+     "subtasks": [
+      [
+       "run-seethrough-guest"
       ]
      ]
     }
