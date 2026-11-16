@@ -9,6 +9,12 @@ JSON-LD in, Lottie out: the domain and one plan for each part go in, and one Lot
 - A Branch node is a composite method with two or more alternatives. The way the plan took is lit, and the other is dim.
 - Every wire is solid. A dotted line is not a Blueprint thing.
 
+## Layers have no limit unless you set one
+
+By default a plan is drawn as one layer, however many nodes it has. `--cap N` (nodes) and `--complexity N` (independent paths: the Branch nodes plus one) set a limit. A plan over it is drawn as a layer of Extract nodes. Each Extract node stands for a run of the plan's nodes and opens onto a layer of its own, titled "Inside ..."; a Branch stays with its alternatives, so a run is never cut through one. The words "Extract" and "N nodes" are the converter's own.
+
+Numbers to start from, taken from NASA and JPL's rules for code that must not fail, with a node standing for a statement: 30 nodes (Power of Ten, rule 4: a function is about 60 lines, and 30 for the body of one compound statement) and 10 paths (SWE-220 allows 15 for safety-critical code and reads 10 or less as well structured). Today's four plans (20, 9, 20 and 13 nodes, at most two Branch nodes) fit both. The witness runs the Extract layers at a cap of 7 and a complexity limit of 2.
+
 ## Nothing is drawn that the JSON-LD did not say
 
 The converter may hide what the JSON-LD says, but it may not add to it. A node is a plan step, titled from the action's key. Its pins are the facts it reads and sets, its time is its duration, and a caption is a variable's own description. The words that are the converter's own are "Sequence", "Then N", "not timed", "GPU" and a count of inputs the desk states.
@@ -24,6 +30,7 @@ The converter may hide what the JSON-LD says, but it may not add to it. A node i
 | `inputs/` | the poseswap domain and the planner's four plans: the presence slice, one relay tick, the AUX route and the obstacle course |
 | `poseswap-plan.lottie.json`, `poseswap-plan.transcript.md` | the animation, and the same graph as text |
 | `tests/golden/transcript.md` | the committed text version that the check compares against |
+| `lottie/` | each plan as a Lottie of its own, with its text version (`viewer.html?plan=0-presence`, `1-relay`, `2-aux`, `3-course`) |
 | `viewer.html` | a page that plays it, with Pause, Restart, speed, a status line, and the text version below |
 | `make.sh` | build, draw, check |
 

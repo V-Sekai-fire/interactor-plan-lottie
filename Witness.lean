@@ -68,6 +68,15 @@ def snapped (c : Cfg) (m : Model) : Bool := m.nodes.all fun n => onGrid c.grid n
 def subsFit (m : Model) : Bool := m.nodes.all fun n => n.sub.length ≤ 34
 def readable (c : Cfg) (dom : Json) (plans : List Json) : Bool := (readingWindows c dom plans).all fun (need, avail) => avail ≥ need
 
+/-- The most nodes any one layer draws. -/
+def widest (m : Model) : Nat := m.parts.foldl (fun w p => max w p.laid.order.length) 0
+
+/-- The steps the layers hold themselves: a layer of Extract nodes holds none, the layers it opens hold them. -/
+def heldSteps (m : Model) : List String := (m.parts.filter (·.expand.isEmpty)).flatMap (·.steps)
+
+/-- The most independent paths through any one layer. -/
+def hardest (m : Model) : Nat := m.parts.foldl (fun w p => max w (complexity p.laid)) 0
+
 def opOf (doc : Json) : Float := match doc.getObjVal? "op" with | .ok o => ((o.getNum?).toOption.map (·.toFloat)).getD 0 | .error _ => 0
 
 /-! ## Leaks: nothing drawn that the JSON-LD did not say -/
@@ -102,6 +111,7 @@ def chrome (s : String) : Bool :=
   s == "Sequence" || s == "not timed" || s == "not timed · GPU" || s == "GPU" || s == "" ||
   ((s.startsWith "Then ") && (s.drop 5).toString.all Char.isDigit) ||
   ((s.startsWith "Then ") && !((s.drop 5).toString.takeWhile Char.isDigit).isEmpty && ((s.drop 5).toString.dropWhile Char.isDigit).toString == ". ") ||
+  ((s.startsWith "Extract · ") && (s.endsWith " nodes") && !((s.drop 10).toString.takeWhile Char.isDigit).isEmpty) ||
   ((s.startsWith "+ ") && (s.endsWith " stated by the desk") && !((s.drop 2).toString.takeWhile Char.isDigit).isEmpty)
 
 def unmarked (c : Cfg) (dom : Json) (plans : List Json) : List String :=
@@ -130,7 +140,7 @@ def main (args : List String) : IO UInt32 := do
       let allSteps := plans.flatMap plannedOf
       let groups := groupsOf dom
       let altPrims := groups.flatMap fun g => g.alts.flatMap (·.prims)
-      let invented := (nodeNames doc).filter fun k => !allSteps.contains k && !altPrims.contains k && !k.startsWith "BR " && k != "RUN" && k != "SEQ"
+      let invented := (nodeNames doc).filter fun k => !allSteps.contains k && !altPrims.contains k && !k.startsWith "BR " && !k.startsWith "EX " && k != "RUN" && k != "SEQ"
       let planMinus := plans.map fun p => setKey p "steps" (A ((items (p.getObjValD "steps")).filter fun s => strOf (s.getObjValD "action") != (allSteps.headD "")))
       let hidden := (nodeNames (render c dom planMinus)).contains (allSteps.headD "")
       let emptyDom := J [("actions", J []), ("methods", J []), ("variables", A [])]
@@ -143,8 +153,21 @@ def main (args : List String) : IO UInt32 := do
           { name := "GOLDEN every drawn node is a plan step, an alternative of a method, a Branch, or the two head nodes", ok := invented.isEmpty },
           { name := "GOLDEN every data wire joins a pin that exists", ok := wiresOk m },
           { name := "CONTROL a wire to a pin that does not exist is refused", ok := !wiresOk { m with dataEdges := (allSteps.headD "", "nope", allSteps.headD "", "nope", false) :: m.dataEdges } },
-          { name := "GOLDEN the sequence reaches every node from the event", ok := (unreached m m.exec).isEmpty },
-          { name := "CONTROL a missing exec wire leaves nodes unreached", ok := !(unreached m (m.exec.drop 3)).isEmpty },
+          { name := "GOLDEN the sequence reaches every node from the event, through the Extract nodes", ok := (unreached m (m.exec ++ m.expand)).isEmpty },
+          { name := "CONTROL a missing exec wire leaves nodes unreached", ok := !(unreached m (m.exec.drop 3 ++ m.expand)).isEmpty },
+          { name := "GOLDEN with no limit set, no Extract node is drawn", ok := m.expand.isEmpty },
+          { name := "INVARIANT at a cap of 30 no layer draws more than 30 nodes", ok := widest (model { c with cap := some 30 } dom plans) ≤ 30 },
+          { name := "CONTROL a layer over the cap is caught: with no limit a plan draws more than 7 nodes in one layer", ok := widest m > 7 },
+          { name := "INVARIANT at a complexity limit of 10 no layer has more than 10 independent paths", ok := hardest (model { c with maxComplexity := some 10 } dom plans) ≤ 10 },
+          { name := "CONTROL a layer of ten Branch nodes is over a complexity limit of 10", ok := complexity ({ order := (List.range 10).map fun i => s!"BR {i}" } : Laid) > 10 },
+          { name := "GOLDEN at a cap of 7 the over-cap plans become Extract layers that hold every step", ok :=
+              let m7 := model { c with cap := some 7 } dom plans
+              widest m7 ≤ 7 && heldSteps m7 == allSteps && !m7.expand.isEmpty },
+          { name := "GOLDEN a complexity limit of 2 splits a plan with two Branch nodes into layers of at most 2 paths", ok :=
+              let m2 := model { c with maxComplexity := some 2 } dom plans
+              hardest m2 ≤ 2 && heldSteps m2 == allSteps },
+          { name := "INVARIANT every step is held by exactly one layer, in order", ok := heldSteps m == allSteps },
+          { name := "CONTROL an Extract layer taken out loses its steps", ok := heldSteps { m with parts := m.parts.drop 2 } != allSteps },
           { name := "INVARIANT every node, and its height, sits on the 16-pixel grid", ok := snapped c m },
           { name := "CONTROL with the grid off, some node is off the grid", ok := !(snapped c (model { c with grid := 0 } dom plans)) },
           { name := "INVARIANT every sub-line fits inside a node (34 characters)", ok := subsFit m },
