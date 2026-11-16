@@ -17,10 +17,6 @@ Draws a planner's JSON-LD plan as a Lottie animation in the style of Unreal Engi
 
 The converter may hide what the JSON-LD says, but it may not add to it. The words that are the converter's own are "Sequence", "Then N", "not timed", "GPU" and a count of stated inputs. `plan_lottie_witness` checks this by planting marks: it renders from an empty domain, then from a domain in which every string carries a mark, and fails if a word on screen has neither.
 
-## Layers have no limit unless you set one
-
-By default a plan is one layer however many nodes it has. `--cap N` (nodes) and `--complexity N` (independent paths: the Branch nodes plus one) set a limit. A plan over it is drawn as a layer of Extract nodes. Each stands for a run of the plan's nodes and opens onto a layer of its own, and a Branch stays with its alternatives.  No number is built in.
-
 ## Use it
 
 You need [Lean 4](https://lean-lang.org/) (the version in `lean-toolchain`, installed by `elan`) and `lake`.
@@ -30,7 +26,7 @@ You need [Lean 4](https://lean-lang.org/) (the version in `lean-toolchain`, inst
 builds the converter, draws every plan in `inputs/plans/` into `lottie/`, and runs the checks. To draw your own:
 
     lake build plan_lottie
-    .lake/build/bin/plan_lottie [--grid N] [--cap N] [--complexity N] [--transcript out.md] <domain.jsonld> <out.lottie.json> <plan.jsonld>...
+    .lake/build/bin/plan_lottie [--grid N] [--transcript out.md] <domain.jsonld> <out.lottie.json> <plan.jsonld>...
 
 One Sequence node runs a part for each plan given. To play a result, serve this folder (`python3 -m http.server`) and open `/viewer.html`, or `/viewer.html?plan=<n>-<name>` for one plan. A `file://` page cannot fetch the JSON. The viewer loads lottie-web from cdnjs, pinned by an integrity hash, and has Pause, Restart and speed controls. It starts paused if the system asks for reduced motion.
 

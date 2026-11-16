@@ -12,10 +12,6 @@ structure Cfg where
   grid : Float := 16
   /-- Hold each part on screen until its captions can be read. -/
   readPause : Bool := true
-  /-- The most nodes one layer holds, or none for no limit (the default). A plan over it is drawn as a layer of Extract nodes, each opening onto a layer of its own. -/
-  cap : Option Nat := none
-  /-- The most independent paths through one layer (its Branch nodes plus one), or none for no limit (the default). -/
-  maxComplexity : Option Nat := none
 def Cfg.snap (c : Cfg) (v : Float) : Float := if c.grid > 0 then Float.round (v / c.grid) * c.grid else v
 def Cfg.nw (c : Cfg) : Float := if c.grid > 0 then 208 else 210
 def Cfg.pitch (c : Cfg) : Float := if c.grid > 0 then 256 else 246
@@ -41,7 +37,6 @@ def hdr : String → Col
   | "rig" | "edit" => c3 0.42 0.24 0.62
   | "avatar" => c3 0.1 0.46 0.44
   | "event" => c3 0.62 0.1 0.1
-  | "extract" => c3 0.12 0.42 0.52
   | "branch" => c3 0.32 0.32 0.36
   | _ => c3 0.3 0.3 0.34
 
