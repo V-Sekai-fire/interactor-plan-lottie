@@ -1,0 +1,48 @@
+"@context":
+  VSEKAI: https://v-sekai.org/
+  domain: VSEKAI:planning/domain/
+"@type": domain:Plan
+name: relay_loop_ready_problem_plan
+domain: presence_edit
+problem: relay_loop_ready_problem
+reached: true
+temporal:
+  consistent: true
+  origin: '2026-11-15T08:00:00Z'
+  total: PT0S
+steps:
+- action: drain-sockets
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: identify-sender
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: offer-frame
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: send-to-others
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: tick-zones
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: catch-up-if-late
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S
+- action: wait-for-next-tick
+  params: []
+  start: '2026-11-15T08:00:00Z'
+  end: '2026-11-15T08:00:00Z'
+  duration: PT0S

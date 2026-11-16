@@ -26,7 +26,7 @@ You need [Lean 4](https://lean-lang.org/) (the version in `lean-toolchain`, inst
 builds the converter, draws every plan in `inputs/plans/` into `lottie/`, and runs the checks. To draw your own:
 
     lake build plan_lottie
-    .lake/build/bin/plan_lottie [--grid N] [--transcript out.md] <domain.jsonld> <out.lottie.json> <plan.jsonld>...
+    .lake/build/bin/plan_lottie [--grid N] [--transcript out.md] <domain.yamlld> <out.lottie.json> <plan.yamlld>...
 
 One Sequence node runs a part for each plan given. To play a result, serve this folder (`python3 -m http.server`) and open `/viewer.html`, or `/viewer.html?plan=<n>-<name>` for one plan. A `file://` page cannot fetch the JSON. The viewer loads lottie-web from cdnjs, pinned by an integrity hash, and has Pause, Restart and speed controls. It starts paused if the system asks for reduced motion.
 
@@ -35,9 +35,10 @@ One Sequence node runs a part for each plan given. To play a result, serve this 
 | Path | What it holds |
 | --- | --- |
 | `PlanLottie/`, `Main.lean` | the converter |
+| `PlanLottie/YamlLd.lean`, `YamlLdWitness.lean` | the YAML-LD reader and writer, and its checks against the examples of the specification |
 | `Witness.lean` | the checks (golden, control, invariant and leak), each with a planted fault where it can fail |
-| `inputs/domain.jsonld` | the planning domain the plans come from |
-| `inputs/plans/` | the plans the planner made from it, named `<n>-<name>.jsonld` |
+| `inputs/domain.yamlld` | the planning domain the plans come from, as [YAML-LD](https://www.w3.org/TR/yaml-ld/) |
+| `inputs/plans/` | the plans the planner made from it, named `<n>-<name>.yamlld` |
 | `lottie/<n>-<name>/` | each plan as `lottie.json` with its text version `transcript.md`, and `all/`, the plans numbered 0 to 3 together |
 | `tests/golden/<n>-<name>/transcript.md` | the committed text versions the checks compare against |
 | `viewer.html` | the player |
@@ -47,7 +48,7 @@ The domain and the plans are the examples. They describe a character-editing pip
 
 ## Change a plan
 
-Plan again with your planner, put the domain at `inputs/domain.jsonld` and the plan at `inputs/plans/<n>-<name>.jsonld`, and run `./make.sh`. The new plan has no golden yet, so copy `lottie/<n>-<name>/transcript.md` to `tests/golden/<n>-<name>/` once you have read it and mean it. For a change to an existing plan, copy the new text version over its golden the same way.
+Plan again with your planner, put the domain at `inputs/domain.yamlld` and the plan at `inputs/plans/<n>-<name>.yamlld`, and run `./make.sh`. The new plan has no golden yet, so copy `lottie/<n>-<name>/transcript.md` to `tests/golden/<n>-<name>/` once you have read it and mean it. For a change to an existing plan, copy the new text version over its golden the same way.
 
 ## What it does not have
 

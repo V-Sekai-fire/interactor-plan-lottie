@@ -11,3 +11,6 @@ lean_exe plan_lottie where
 
 lean_exe plan_lottie_witness where
   root := `Witness
+
+lean_exe yamlld_witness where
+  root := `YamlLdWitness

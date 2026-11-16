@@ -1,0 +1,39 @@
+"@context":
+  VSEKAI: https://v-sekai.org/
+  domain: VSEKAI:planning/domain/
+"@type": domain:Plan
+name: snapshot_only_problem_plan
+domain: presence_edit
+problem: snapshot_only_problem
+reached: true
+temporal:
+  consistent: true
+  total: PT0S
+steps:
+- action: encode-packets
+  params: []
+  duration: PT0S
+- action: route-model
+  params: []
+  duration: PT0S
+- action: seal-and-take
+  params: []
+  duration: PT0S
+- action: judge
+  params: []
+  duration: PT0S
+- action: agree
+  params: []
+  duration: PT0S
+- action: play-curve
+  params: []
+  duration: PT0S
+- action: fit-anny
+  params: []
+  duration: PT0S
+- action: follow
+  params: []
+  duration: PT0S
+- action: snapshot
+  params: []
+  duration: PT0S
