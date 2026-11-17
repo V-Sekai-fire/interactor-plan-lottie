@@ -1,0 +1,2146 @@
+"@context":
+  VSEKAI: https://v-sekai.org/
+  domain: VSEKAI:planning/domain/
+"@type": domain:Definition
+name: presence_edit
+source: 3d-character-poseswap
+version: 0.1.0
+description: 'A body is encoded to packets, routed, sealed and judged, optionally agreed by four replicas, played back on a curve, followed by the fitted ANNY avatar (interactor-anny-fit-guest fits it, interactor-anny-follow-guest poses it). The presence gates take a snapshot of that playback. OmniGen2 with the EditScore LoRA merged edits the snapshot, and EditScore scores the edit; both run in the interactor-omnigen2-guest ELF, written in Lean 4, of which the mul_mat op is built and checked. Each stage is a repository checked out beside the others. Variables are declared here and given their values by a problem. The AUX route then labels garment parts, measures whether each is rigid or soft from motion lag, and rigs them: relabel-coco: Map every source class of the Fashionpedia-class set into Skirt, Sleeve, Collar, Cape, Accessory, Fitted and Detail with a motion prior; drop nothing (repro/relabel_coco.py).; make-synth-set: Render GarmentCodeData drapes on the neutral body into a COCO set with exact part masks, split by garment (repro/gen_synth.py).; train-part-detector: Fine-tune RF-DETR-Seg-Small on the relabelled and the synthetic sets (repro/train_synth.py).; unitise-source: Normalise the source GLB into the unit cube before Segment; a centimetre source made the lookup distance 94 instead of 0.0007 (repro/common.py unitise_glb_inplace).; write-scale-sidecar: Write scale and offset beside every unit-cube mesh, with the metric size from a body-height prior; image-to-mesh models return unit-cube meshes only.; segment-labels: Run Alchemy3D-Segment with maps from the part detector; labels are anonymous clusters that need our own colour-to-class table.; build-warp: Build the NvidiaWarp-GarmentCode fork; fedora''s gcc 16 is refused by CUDA 12.4 (gcc 13 is the limit), so a compatible host compiler is needed.; measure-motion-lag: Drape, move the body, and measure which vertices lag; a part that lags is soft, a part that follows is rigid. Clearance from the body is only a first signal.; make-hair-cards: HairDeck: portrait to hair cards on Apple MPS; needs SAM 3 and DINOv3 weights whose SHA-256 matches the pins.; make-spring-chains: HairDeck chain model: path, joints and stiffness per chain, in the normalised frame; apply the scale sidecar before fitting.; rig-aux-parts: Give soft parts spring-bone chains and rigid parts a parent bone, from the labels and the measured lag; SkinTokens rigs the body. Composite methods: /aux/labelled_parts (labels and scale sidecar), /aux/soft_rigid_known (labels and measured lag), /aux/rigged (labelled parts, the soft/rigid decision and the spring chains). Each AUX action states an ISO-8601 duration and a duration_basis (measured or estimate), so a plan''s temporal total is a sum of those; the estimates are marked and should be replaced as runs are timed. The source is ingested into OpenUSD, which keeps its unit and up axis as stage metadata, and every other format is delivered from the stage: unitise-source makes the unit-cube GLB for Segment and its sidecar from the stage, and restore-units is its inverse. Parts are keyed by integer ids, never by names. No weld step: the weld was a workaround for the unit bug.'
+variables:
+- name: part
+  type: int
+  description: 1 when a repository of the presence slice, or a model repository, is checked out beside the others.
+  init: {}
+- name: input
+  type: int
+  description: '1 when an input is on hand: a double-precision Godot editor, the packet golden file, the MuJoCo guest, the 100 Hz clips, the ANNY base mesh, the SOMA phenotype data, the built ANNY fit guest ELF, the OmniGen2 guest ELF built with only the mul_mat op, the full OmniGen2 guest ELF, a free GPU host, an edit prompt; for the AUX route: a Fashionpedia-class COCO set, the GarmentCodeData drapes, the Segment weights, SAM 3 and DINOv3 weights checked against their pinned SHA-256, a host C++ compiler the CUDA toolkit accepts, a body motion clip, a portrait.'
+  init:
+    gpu: 0
+    garment_image: 0
+    birefnet_weights: 0
+    pixal3d_weights: 0
+- name: switch
+  type: int
+  description: 1 when the optional replica stage is on.
+  init: {}
+- name: bypass
+  type: int
+  description: 1 when the replica stage is off and passes the judged body through.
+  init: {}
+- name: model
+  type: int
+  description: 1 when a model file is loaded.
+  init: {}
+- name: body
+  type: int
+  description: 1 when the body has passed a stage of the presence slice.
+  init: {}
+- name: avatar
+  type: int
+  description: 1 when the avatar is fitted or posed.
+  init: {}
+- name: op
+  type: int
+  description: 1 when an op of the OmniGen2 guest is checked against its fixture.
+  init: {}
+- name: image
+  type: int
+  description: 1 when the image of a stage is produced.
+  init: {}
+- name: aux
+  type: int
+  description: '1 when a step of the AUX part-labelling and rigging route is done: coco_relabelled, synth_set, part_detector, unit_cube_source, part_labels, warp_built, motion_lag, hair_cards, spring_chains, scale_sidecar; composites labelled_parts, soft_rigid_known and rigged; also usd_stage (the source ingested into OpenUSD in its own units) and metric_labels (Segment''s labels put back on the real-size stage by restore-units).'
+  init: {}
+- name: course_input
+  type: int
+  description: '1 when an input of the obstacle course (entities-obstacle-course) is on hand: the SOMA clips under motion/, the skintokens.elf and mm.elf build products, a skinned model, the course script, a Godot project, vmc.elf and a VMC sender.'
+  init: {}
+- name: course
+  type: int
+  description: '1 when a step of the obstacle course is done: clips_baked, clips_on_model, shapes_baked, colliders_checked, input_ready, clip_picked, posed, grounded, muscle_driven, avatar_follows, finished.'
+  init: {}
+- name: relay_input
+  type: int
+  description: '1 when an input of the zone relay (transport-zone-relay) is on hand: the socket for the first halves of frames, and the socket for the second halves.'
+  init: {}
+- name: relay
+  type: int
+  description: '1 when a step of one relay tick is done: datagrams, person, offered, handled, ticked, caught_up, next_tick.'
+  init: {}
+- name: guest_input
+  type: int
+  description: '1 when a guest of the sandbox is ready to run: its repository is checked out (<name>_repo) or its ELF is built (<name>_elf), for usd, udim_unpack, remesh, cage, drape, cloth_fit, garment_fit, headfit, skintokens, skintokens_rig, pixal3d, seethrough.'
+  init: {}
+- name: guest
+  type: int
+  description: '1 when the guest ELF of that name has run its stage: usd, udim_unpack, remesh, cage, drape, cloth_fit, garment_fit, headfit, skintokens, skintokens_rig, pixal3d, seethrough.'
+  init: {}
+- name: cad_input
+  type: int
+  description: '1 when what the CAD guest needs is on hand: the SolidCraft engine checkout (solidcraft_engine), the guest repository (guest_repo) and solidcraft-guest.elf built (guest_elf).'
+  init: {}
+- name: cad
+  type: int
+  description: '1 when the CAD guest function of that name has run: solid_default, solid_box, solid_mesh, solid_script, solid_command_count.'
+  init: {}
+actions:
+  load-qwen25vl-conditioner:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /part/omnigen2
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /model/qwen25vl_conditioner
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT3.202S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:00:04.429Z'
+    duration_basis: 'measured: warm median 3.202 s of 4 runs, exact to the millisecond; slowest run 4.429 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured'
+    measured:
+      runs_s:
+      - 4.429
+      - 3.346
+      - 3.202
+      - 3.202
+      - 3.142
+      cold_s: 4.429
+      warm_median_s: 3.202
+      host: fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)
+    description: Needs the omnigen2 repository checked out, the omnigen2 elf on hand and a free GPU host. Makes the qwen25vl conditioner loaded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  load-omnigen2-transformer:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /part/omnigen2
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /model/omnigen2_transformer
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT3.26S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:00:15.837Z'
+    duration_basis: 'measured: warm median 3.26 s of 4 runs, exact to the millisecond; slowest run 11.408 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured'
+    measured:
+      runs_s:
+      - 11.408
+      - 3.257
+      - 3.327
+      - 3.179
+      - 3.262
+      cold_s: 11.408
+      warm_median_s: 3.26
+      host: fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)
+    description: Needs the omnigen2 repository checked out, the omnigen2 elf on hand and a free GPU host. Makes the omnigen2 transformer loaded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  load-omnigen2-vae:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /part/omnigen2
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /model/omnigen2_vae
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT0.097S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:00:16.112Z'
+    duration_basis: 'measured: warm median 0.097 s of 4 runs, exact to the millisecond; slowest run 0.275 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured'
+    measured:
+      runs_s:
+      - 0.275
+      - 0.096
+      - 0.097
+      - 0.097
+      - 0.097
+      cold_s: 0.275
+      warm_median_s: 0.097
+      host: fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)
+    description: Needs the omnigen2 repository checked out, the omnigen2 elf on hand and a free GPU host. Makes the omnigen2 vae loaded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  load-editscore-lora:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/editscore
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /model/editscore_lora
+      value: 1
+    duration: PT0.006S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:00:00.053Z'
+    duration_basis: 'measured: warm median 0.006 s of 4 runs, exact to the millisecond; slowest run 0.053 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured'
+    measured:
+      runs_s:
+      - 0.053
+      - 0.006
+      - 0.006
+      - 0.006
+      - 0.006
+      cold_s: 0.053
+      warm_median_s: 0.006
+      host: fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)
+    description: Needs the editscore repository checked out, the omnigen2 elf on hand and a free GPU host. Makes the editscore lora loaded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  merge-editscore-lora:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/omnigen2_transformer
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/editscore_lora
+        value: 1
+    - pointer/set: /model/editscore_merged
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT0.174S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:00:16.440Z'
+    duration_basis: 'measured: warm median 0.174 s of 4 runs, exact to the millisecond; slowest run 0.328 s (cold). start is the release time and end the deadline if every action in the chain takes its slowest run, so the span covers every run measured'
+    measured:
+      runs_s:
+      - 0.328
+      - 0.172
+      - 0.174
+      - 0.174
+      - 0.174
+      cold_s: 0.328
+      warm_median_s: 0.174
+      host: fedora, RTX 4090, driver 615.71.09, BF16 base weights, 5 runs, the first cold from disk (tools/measure/time_loads.py, 2026-11-15)
+    description: Needs the omnigen2 transformer loaded and the editscore lora loaded. Makes the editscore merged loaded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  fetch-clips:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/muscle_drive_release
+        value: 1
+    - pointer/set: /input/clips
+      value: 1
+    description: Needs the muscle drive release repository checked out. Makes the clips on hand.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  encode-packets:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/packets
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/packet_golden
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/clips
+        value: 1
+    - pointer/set: /body/packet
+      value: 1
+    description: Needs the packets repository checked out, the godot double on hand, the packet golden on hand and the clips on hand. Makes the body packet.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  route-model:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/zone_router
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/packet
+        value: 1
+    - pointer/set: /body/routed
+      value: 1
+    description: Needs the zone router repository checked out, the godot double on hand and the body packet. Makes the body routed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  route-relay:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/zone_relay
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/packet
+        value: 1
+    - pointer/set: /body/routed
+      value: 1
+    description: Needs the zone relay repository checked out, the godot double on hand and the body packet. Makes the body routed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  seal-and-take:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/observer
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/routed
+        value: 1
+    - pointer/set: /body/sealed
+      value: 1
+    description: Needs the observer repository checked out, the godot double on hand and the body routed. Makes the body sealed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  judge:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/observer
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/sealed
+        value: 1
+    - pointer/set: /body/judged
+      value: 1
+    description: Needs the observer repository checked out, the godot double on hand and the body sealed. Makes the body judged.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  agree:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/replica
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /switch/replica
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/judged
+        value: 1
+    - pointer/set: /body/agreed
+      value: 1
+    description: Needs the replica repository checked out, the replica stage on and the body judged. Makes the body agreed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  skip-agree:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /bypass/replica
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/judged
+        value: 1
+    - pointer/set: /body/agreed
+      value: 1
+    description: Needs the replica stage bypassed and the body judged. Makes the body agreed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  play-curve:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/curve
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/agreed
+        value: 1
+    - pointer/set: /body/played
+      value: 1
+    description: Needs the curve repository checked out, the godot double on hand and the body agreed. Makes the body played.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  check-mul-mat:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/omnigen2
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_mul_mat_elf
+        value: 1
+    - pointer/set: /op/mul_mat
+      value: 1
+    description: Needs the omnigen2 repository checked out, the godot double on hand and the omnigen2 mul mat elf on hand. Makes the mul mat op checked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  fit-anny:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/anny_fit
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/anny_fit_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/soma_pheno
+        value: 1
+    - pointer/set: /avatar/fitted
+      value: 1
+    description: Needs the anny fit repository checked out, the godot double on hand, the anny fit elf on hand and the soma pheno on hand. Makes the avatar fitted.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  follow:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/anny_follow
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /avatar/fitted
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/mujoco_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/anny_glb
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/clips
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /body/played
+        value: 1
+    - pointer/set: /avatar/posed
+      value: 1
+    description: Needs the anny follow repository checked out, the avatar fitted, the godot double on hand, the mujoco elf on hand, the anny glb on hand, the clips on hand and the body played. Makes the avatar posed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  snapshot:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /part/presence_gates
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /avatar/posed
+        value: 1
+    - pointer/set: /image/snapshot
+      value: 1
+    description: Needs the presence gates repository checked out, the godot double on hand and the avatar posed. Makes the snapshot image.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  edit:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /image/snapshot
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/edit_prompt
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /part/omnigen2
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/qwen25vl_conditioner
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/omnigen2_transformer
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/omnigen2_vae
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /model/editscore_merged
+        value: 1
+    - pointer/set: /image/edited
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT1M7S
+    duration_basis: 'measured once: 67.0 s for one 50-step BF16 edit at 672x1024 with the LoRA (baseline.log, fedora RTX 4090), exact to the millisecond; a single sample, so no range'
+    measured:
+      runs_s:
+      - 67.0
+      host: fedora, RTX 4090 (baseline.log, one run)
+    description: Needs the snapshot image, an edit prompt, a free GPU host, the omnigen2 repository checked out, the qwen25vl conditioner loaded, the omnigen2 transformer loaded, the omnigen2 vae loaded and the editscore merged loaded. Makes the edited image.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  score:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /part/editscore
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/omnigen2_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /image/edited
+        value: 1
+    - pointer/set: /image/scored
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT21.45S
+    start: '2026-11-15T08:00:00Z'
+    end: '2026-11-15T08:01:46.040Z'
+    duration_basis: 'measured: median 21.450000000000003 s per edit over 6 edits (K=4 passes of the Qwen3-VL-8B judge), exact to the millisecond; slowest 22.6 s. Excludes the one-time 24.9 s judge load and smoke test, which no action models. end is the deadline when the loads, edit and score all take their slowest run'
+    measured:
+      runs_s:
+      - 20.8
+      - 21.8
+      - 19.4
+      - 22.6
+      - 21.1
+      - 22.1
+      judge_load_and_smoke_s: 24.9
+      host: fedora, RTX 4090, 6 edits of bf16-lora, tools/measure/time_score.sh, 2026-11-15
+    description: Needs the editscore repository checked out, the omnigen2 elf on hand, a free GPU host and the edited image. Makes the scored image.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  relabel-coco:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/coco_set
+        value: 1
+    - pointer/set: /aux/coco_relabelled
+      value: 1
+    duration: PT7.81S
+    duration_basis: 'measured: warm median 7.81 s of 5 runs, to the millisecond; the first run took 7.907 s. Wall clock of tools/aux.sh action relabel-coco on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 7.907
+      - 7.864
+      - 7.83
+      - 7.796
+      - 7.81
+      - 7.796
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: Map every source class of the Fashionpedia-class set into Skirt, Sleeve, Collar, Cape, Accessory, Fitted and Detail with a motion prior.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  make-synth-set:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gcd_drapes
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /aux/synth_set
+      value: 1
+    duration: PT8M32S
+    duration_basis: 'measured: 360 garments on fedora, 2026-11-15'
+    description: Render GarmentCodeData drapes on the neutral body into a COCO set with exact part masks, split by garment (repro/gen_synth.py).
+    description_basis: 'written: the sentence the domain description gives for this action'
+  train-part-detector:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/coco_relabelled
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/synth_set
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /aux/part_detector
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT19M24S
+    duration_basis: 'measured: 15 epochs on the 3-class set, one RTX 4090'
+    description: Fine-tune RF-DETR-Seg-Small on the relabelled and the synthetic sets (repro/train_synth.py).
+    description_basis: 'written: the sentence the domain description gives for this action'
+  unitise-source:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/usd_stage
+        value: 1
+    - pointer/set: /aux/unit_cube_source
+      value: 1
+    duration: PT0.698S
+    duration_basis: 'measured: warm median 0.698 s of 5 runs, to the millisecond; the first run took 0.693 s. Wall clock of tools/aux.sh action unitise-source on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 0.693
+      - 0.699
+      - 0.696
+      - 0.698
+      - 0.71
+      - 0.698
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: Normalise the source GLB into the unit cube before Segment.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  write-scale-sidecar:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/unit_cube_source
+        value: 1
+    - pointer/set: /aux/scale_sidecar
+      value: 1
+    duration: PT0.423S
+    duration_basis: 'measured: warm median 0.423 s of 5 runs, to the millisecond; the first run took 0.434 s. Wall clock of tools/aux.sh action write-scale-sidecar on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 0.434
+      - 0.423
+      - 0.427
+      - 0.423
+      - 0.422
+      - 0.423
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: Write scale and offset beside every unit-cube mesh, with the metric size from a body-height prior.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  segment-labels:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/part_detector
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/unit_cube_source
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/segment_weights
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /aux/part_labels
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT1M
+    duration_basis: 'estimate: Segment alone took 6 to 12 s on the pony example; this adds the garment render and the maps'
+    description: Run Alchemy3D-Segment with maps from the part detector.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  build-warp:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/host_cxx_ok
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /aux/warp_built
+      value: 1
+    duration: PT30M
+    duration_basis: 'estimate: not built yet; blocked on the host compiler'
+    description: Build the NvidiaWarp-GarmentCode fork.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  measure-motion-lag:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/part_labels
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/warp_built
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/body_motion_clip
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gcd_drapes
+        value: 1
+    - pointer/set: /aux/motion_lag
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration: PT1H
+    duration_basis: 'estimate: not built yet'
+    description: Drape, move the body, and measure which vertices lag.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  make-hair-cards:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/portrait
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/sam3_dinov3_verified
+        value: 1
+    - pointer/set: /aux/hair_cards
+      value: 1
+    duration: PT21.082S
+    duration_basis: 'measured: warm median 21.082 s of 3 runs, to the millisecond; the first run took 21.851 s. Wall clock of tools/aux.sh action make-hair-cards on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 21.851
+      - 21.07
+      - 21.082
+      - 21.084
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: 'HairDeck: portrait to hair cards on Apple MPS.'
+    description_basis: 'written: the sentence the domain description gives for this action'
+  make-spring-chains:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/hair_cards
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/scale_sidecar
+        value: 1
+    - pointer/set: /aux/spring_chains
+      value: 1
+    duration: PT2S
+    duration_basis: 'measured: 1.3 s inside the same HairDeck run'
+    description: 'HairDeck chain model: path, joints and stiffness per chain, in the normalised frame.'
+    description_basis: 'written: the sentence the domain description gives for this action'
+  rig-aux-parts:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/labelled_parts
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/soft_rigid_known
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/spring_chains
+        value: 1
+    - pointer/set: /aux/rigged
+      value: 1
+    duration: PT1M
+    duration_basis: 'estimate: not built yet'
+    description: Give soft parts spring-bone chains and rigid parts a parent bone, from the labels and the measured lag.
+    description_basis: 'written: the sentence the domain description gives for this action'
+  close-labelling:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/metric_labels
+        value: 1
+    - pointer/set: /aux/labelled_parts
+      value: 1
+    duration: PT0S
+    duration_basis: composite marker
+    description: Needs metric labels. Makes labelled parts.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  classify-soft-rigid:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/labelled_parts
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/motion_lag
+        value: 1
+    - pointer/set: /aux/soft_rigid_known
+      value: 1
+    duration: PT1S
+    duration_basis: estimate
+    description: Needs labelled parts and motion lag. Makes soft rigid known.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  classify-by-class-prior:
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/labelled_parts
+        value: 1
+    - pointer/set: /aux/soft_rigid_known
+      value: 1
+    - pointer/set: /aux/soft_rigid_prior_only
+      value: 1
+    duration: PT1S
+    duration_basis: 'estimate: the table in tests/evidence/class_motion_counts.json decides soft, rigid or parent for each class whose motion covers 80% of its annotations (Skirt and Cape soft, Detail parent, Accessory and Fitted rigid) and leaves Collar and Sleeve as measure, which only the lag measurement settles. A lookup in a table of 7 classes; the script that once timed it at 0.02 s was removed, so no run backs the PT1S and the action has no code yet'
+    description: Needs labelled parts. Makes soft rigid known and soft rigid prior only.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  ingest-usd:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/source_mesh
+        value: 1
+    - pointer/set: /aux/usd_stage
+      value: 1
+    duration: PT0.658S
+    duration_basis: 'measured: warm median 0.658 s of 5 runs, to the millisecond; the first run took 0.646 s. Wall clock of tools/aux.sh action ingest-usd on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 0.646
+      - 0.658
+      - 0.645
+      - 0.643
+      - 0.672
+      - 0.672
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: Needs source mesh. Makes usd stage.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  restore-units:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /aux/part_labels
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/scale_sidecar
+        value: 1
+    - pointer/set: /aux/metric_labels
+      value: 1
+    duration: PT0.741S
+    duration_basis: 'measured: warm median 0.741 s of 5 runs, to the millisecond; the first run took 0.741 s. Wall clock of tools/aux.sh action restore-units on fedora, which includes process and model start-up'
+    measured:
+      runs_s:
+      - 0.741
+      - 0.739
+      - 0.739
+      - 0.741
+      - 0.744
+      - 0.765
+      host: node-1w7jr9qmdnujmtqxifhewsfsn.ipv6.telus.net, RTX 4090, tools/measure/time_actions.py, 2026-11-15
+    description: Needs part labels and scale sidecar. Makes metric labels.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  use-dataset-mesh:
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/source_mesh
+        value: 1
+    - pointer/set: /aux/source_mesh
+      value: 1
+    duration: PT1S
+    duration_basis: 'estimate: a bookkeeping step. It reads the mesh the desk states and does no work, so it takes the planner''s smallest span, one second'
+    description: Needs the source mesh on hand. Makes source mesh.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  matte-image:
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/garment_image
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/birefnet_weights
+        value: 1
+    - pointer/set: /aux/matted_image
+      value: 1
+    duration_basis: 'measured: warm median 0.0564 s per image of 5 runs, to the millisecond; the cold first run took 0.8301 s. Excludes the one-time 4.75 s model load, which no action models. One portrait (768x960), BiRefNet-matting at 1024, half precision'
+    duration: PT0.056S
+    measured:
+      runs_s:
+      - 0.8301
+      - 0.0552
+      - 0.0576
+      - 0.0548
+      - 0.057
+      - 0.0564
+      model_load_s: 4.75
+      host: fedora, NVIDIA GeForce RTX 4090, torch 2.8.0+cu128, tools/measure/time_matte.py, 2026-11-15
+    description: Needs the garment image on hand and the birefnet weights on hand. Makes matted image.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  pixal3d-image-to-mesh:
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /aux/matted_image
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/pixal3d_weights
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu_host
+        value: 1
+    - pointer/set: /aux/source_mesh
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    duration_basis: 'not timed: Pixal3D (multi-view checkpoints, on TRELLIS.2) has been fetched but never run on a garment image; no span is stated'
+    description: Needs matted image, the pixal3d weights on hand and a free GPU host. Makes source mesh.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  bake-clips:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/soma_clips
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - pointer/set: /course/clips_baked
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs the soma clips on hand and the godot double on hand. Makes clips baked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  rig-clips-on-model:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/clips_baked
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/skintokens_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/rigged_model
+        value: 1
+    - pointer/set: /course/clips_on_model
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs clips baked, the skintokens elf on hand and the rigged model on hand. Makes clips on model.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  bake-course:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/course_script
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/godot_double
+        value: 1
+    - pointer/set: /course/shapes_baked
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs the course script on hand and the godot double on hand. Makes shapes baked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  check-colliders:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/shapes_baked
+        value: 1
+    - pointer/set: /course/colliders_checked
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs shapes baked. Makes colliders checked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  read-keyboard-or-pad:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/godot_project
+        value: 1
+    - pointer/set: /course/input_ready
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs the godot project on hand. Makes input ready.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  read-vmc-capture:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/godot_project
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/vmc_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/vmc_sender
+        value: 1
+    - pointer/set: /course/input_ready
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs the godot project on hand, the vmc elf on hand and the vmc sender on hand. Makes input ready.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  pick-clip:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/clips_baked
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/mm_elf
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course/input_ready
+        value: 1
+    - pointer/set: /course/clip_picked
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs clips baked, the mm elf on hand and input ready. Makes clip picked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  play-clips:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/clips_on_model
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course/clip_picked
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/godot_project
+        value: 1
+    - pointer/set: /course/posed
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs clips on model, clip picked and the godot project on hand. Makes posed.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  hold-at-walls:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/colliders_checked
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course/posed
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/mujoco_elf
+        value: 1
+    - pointer/set: /course/grounded
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs colliders checked, posed and the mujoco elf on hand. Makes grounded.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  drive-muscles:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/grounded
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /input/mujoco_elf
+        value: 1
+    - pointer/set: /course/muscle_driven
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs grounded and the mujoco elf on hand. Makes muscle driven.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  follow-muscle-skeleton:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/muscle_driven
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /course_input/rigged_model
+        value: 1
+    - pointer/set: /course/avatar_follows
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs muscle driven and the rigged model on hand. Makes avatar follows.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  finish-course:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /course/avatar_follows
+        value: 1
+    - pointer/set: /course/finished
+      value: 1
+    duration_basis: 'not timed: the repository is not a Godot project yet and none of it has run under Godot'
+    description: Needs avatar follows. Makes finished.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  drain-sockets:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay_input/socket_first_half
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /relay_input/socket_second_half
+        value: 1
+    - pointer/set: /relay/datagrams
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs the socket first half on hand and the socket second half on hand. Makes datagrams.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  identify-sender:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/datagrams
+        value: 1
+    - pointer/set: /relay/person
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs datagrams. Makes person.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  offer-frame:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/person
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /relay/datagrams
+        value: 1
+    - pointer/set: /relay/offered
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs person and datagrams. Makes offered.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  send-to-others:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/offered
+        value: 1
+    - pointer/set: /relay/handled
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs offered. Makes handled.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  count-refused:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/person
+        value: 1
+    - pointer/set: /relay/handled
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs person. Makes handled.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  tick-zones:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/handled
+        value: 1
+    - pointer/set: /relay/ticked
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs handled. Makes ticked.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  catch-up-if-late:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/ticked
+        value: 1
+    - pointer/set: /relay/caught_up
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs ticked. Makes caught up.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  wait-for-next-tick:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /relay/caught_up
+        value: 1
+    - pointer/set: /relay/next_tick
+      value: 1
+    duration_basis: not timed here; docs/zone-net.md measures the loop on loopback only
+    description: Needs caught up. Makes next tick.
+    description_basis: drafted from the action's own preconditions and effects; no other source
+  run-usd-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/usd_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/usd_elf
+        value: 1
+    - pointer/set: /guest/usd
+      value: 1
+    description: OpenUSD compiled into a RISC-V sandbox guest that opens a stage from bytes, with the probe guest that first proved it could.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-usd-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-udim-unpack-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/udim_unpack_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/udim_unpack_elf
+        value: 1
+    - pointer/set: /guest/udim_unpack
+      value: 1
+    description: udim.elf unpacks UDIM tiles inside a godot-sandbox guest.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-udim-unpack-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-remesh-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/remesh_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/remesh_elf
+        value: 1
+    - pointer/set: /guest/remesh
+      value: 1
+    description: A remesher, simplifier and level-of-detail builder for avatar meshes that runs as a sandbox guest and works on flat arrays.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-remesh-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-cage-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/cage_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/cage_elf
+        value: 1
+    - pointer/set: /guest/cage
+      value: 1
+    description: 'The cage stage as a godot-sandbox guest: the (1,3) biharmonic bind and the in-motion cage fit on L-BFGS-B.'
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-cage-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-drape-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/drape_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/drape_elf
+        value: 1
+    - pointer/set: /guest/drape
+      value: 1
+    description: 'The drape stage as a godot-sandbox guest: AVBD cloth from Lean kernels, run on the CPU and on RenderingDevice.'
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-drape-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-cloth-fit-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/cloth_fit_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/cloth_fit_elf
+        value: 1
+    - pointer/set: /guest/cloth_fit
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    description: 'The cloth-fit stage as a godot-sandbox guest whose compute runs on the GPU: a garment is retargeted onto a new body without intersections.'
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-cloth-fit-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-garment-fit-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/garment_fit_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/garment_fit_elf
+        value: 1
+    - pointer/set: /guest/garment_fit
+      value: 1
+    description: 'The garment fit stage as a godot-sandbox guest: an intersection-free retargeting solve with a signed-distance sampler emitted from Lean.'
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-garment-fit-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-headfit-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/headfit_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/headfit_elf
+        value: 1
+    - pointer/set: /guest/headfit
+      value: 1
+    description: 'The head fit as a sandboxed guest program: it fits the parametric body model''s head and transfers a shared facial-expression set onto it.'
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-headfit-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-skintokens-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/skintokens_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/skintokens_elf
+        value: 1
+    - pointer/set: /guest/skintokens
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    description: SkinTokens auto-rigging on ggml-rd, built as a sandboxed guest program.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-skintokens-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-skintokens-rig-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/skintokens_rig_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/skintokens_rig_elf
+        value: 1
+    - pointer/set: /guest/skintokens_rig
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    description: A small Godot 4 project that runs the SkinTokens rig guest, skintokens.elf, on Godot's RenderingDevice.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-skintokens-rig-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-pixal3d-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/pixal3d_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/pixal3d_elf
+        value: 1
+    - pointer/set: /guest/pixal3d
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    description: Pixal3D (image to 3D, a TRELLIS.2 pipeline) as a godot-sandbox guest ELF whose ggml graph runs on ggml-rd.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-pixal3d-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  run-seethrough-guest:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /input/gpu
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/seethrough_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /guest_input/seethrough_elf
+        value: 1
+    - pointer/set: /guest/seethrough
+      value: 1
+    - pointer/set: /input/gpu
+      value: 1
+    description: See-Through (anime illustration -> inpainted semantic layers + depth) as a godot-sandbox guest ELF whose ggml graph runs on ggml-rd.
+    description_basis: 'written: the first sentence of the README of V-Sekai-fire/interactor-seethrough-guest, read 2026-11-15'
+    duration_basis: 'not timed: no run of this guest has been timed here'
+  solid-default:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/solidcraft_engine
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_elf
+        value: 1
+    - pointer/set: /cad/solid_default
+      value: 1
+    description: 'SolidCraft.solid_default() -> Array: 10x20x30 mm box, canonical example.'
+    description_basis: 'written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15'
+    duration_basis: 'not timed: no call of this function has been timed here'
+  solid-box:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/solidcraft_engine
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_elf
+        value: 1
+    - pointer/set: /cad/solid_box
+      value: 1
+    description: 'SolidCraft.solid_box(float length, float width, float height) -> Array: parameterised box, mm.'
+    description_basis: 'written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15'
+    duration_basis: 'not timed: no call of this function has been timed here'
+  solid-mesh:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/solidcraft_engine
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_elf
+        value: 1
+    - pointer/set: /cad/solid_mesh
+      value: 1
+    description: 'SolidCraft.solid_mesh(int kind, float a, float b, float c) -> Array: [ok, tris, positions, normals, indices].'
+    description_basis: 'written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15'
+    duration_basis: 'not timed: no call of this function has been timed here'
+  solid-script:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/solidcraft_engine
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_elf
+        value: 1
+    - pointer/set: /cad/solid_script
+      value: 1
+    description: 'SolidCraft.solid_script(String script) -> Array: [ok, message, [[name, tris, positions, normals, indices], ...]].'
+    description_basis: 'written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15'
+    duration_basis: 'not timed: no call of this function has been timed here'
+  solid-command-count:
+    params: []
+    body:
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/solidcraft_engine
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_repo
+        value: 1
+    - eval:
+        type: pointer/ge
+        pointer: /cad_input/guest_elf
+        value: 1
+    - pointer/set: /cad/solid_command_count
+      value: 1
+    description: 'SolidCraft.solid_command_count() -> int: engine command-spec count.'
+    description_basis: 'written: the line of sigs/solidcraft.sigs of V-Sekai-fire/interactor-solidcraft-guest for this function, read 2026-11-15'
+    duration_basis: 'not timed: no call of this function has been timed here'
+methods:
+  /model/qwen25vl_conditioner:
+    alternatives:
+    - name: load
+      subtasks:
+      - - load-qwen25vl-conditioner
+  /model/omnigen2_transformer:
+    alternatives:
+    - name: load
+      subtasks:
+      - - load-omnigen2-transformer
+  /model/omnigen2_vae:
+    alternatives:
+    - name: load
+      subtasks:
+      - - load-omnigen2-vae
+  /model/editscore_lora:
+    alternatives:
+    - name: load
+      subtasks:
+      - - load-editscore-lora
+  /model/editscore_merged:
+    alternatives:
+    - name: merge
+      subtasks:
+      - - goal
+        - /model/omnigen2_transformer
+      - - goal
+        - /model/editscore_lora
+      - - merge-editscore-lora
+  /input/clips:
+    alternatives:
+    - name: fetch
+      subtasks:
+      - - fetch-clips
+  /body/packet:
+    alternatives:
+    - name: encode
+      subtasks:
+      - - goal
+        - /input/clips
+      - - encode-packets
+  /body/routed:
+    alternatives:
+    - name: model
+      subtasks:
+      - - goal
+        - /body/packet
+      - - route-model
+    - name: relay
+      subtasks:
+      - - goal
+        - /body/packet
+      - - route-relay
+  /body/sealed:
+    alternatives:
+    - name: seal
+      subtasks:
+      - - goal
+        - /body/routed
+      - - seal-and-take
+  /body/judged:
+    alternatives:
+    - name: judge
+      subtasks:
+      - - goal
+        - /body/sealed
+      - - judge
+  /body/agreed:
+    alternatives:
+    - name: agree
+      subtasks:
+      - - goal
+        - /body/judged
+      - - agree
+    - name: passthrough
+      subtasks:
+      - - goal
+        - /body/judged
+      - - skip-agree
+  /body/played:
+    alternatives:
+    - name: play
+      subtasks:
+      - - goal
+        - /body/agreed
+      - - play-curve
+  /op/mul_mat:
+    alternatives:
+    - name: check
+      subtasks:
+      - - check-mul-mat
+  /avatar/fitted:
+    alternatives:
+    - name: fit
+      subtasks:
+      - - fit-anny
+  /avatar/posed:
+    alternatives:
+    - name: follow
+      subtasks:
+      - - goal
+        - /body/played
+      - - goal
+        - /avatar/fitted
+      - - follow
+  /image/snapshot:
+    alternatives:
+    - name: snapshot
+      subtasks:
+      - - goal
+        - /avatar/posed
+      - - snapshot
+  /image/edited:
+    alternatives:
+    - name: edit
+      subtasks:
+      - - goal
+        - /image/snapshot
+      - - goal
+        - /model/qwen25vl_conditioner
+      - - goal
+        - /model/omnigen2_vae
+      - - goal
+        - /model/editscore_merged
+      - - edit
+  /image/scored:
+    alternatives:
+    - name: score
+      subtasks:
+      - - goal
+        - /image/edited
+      - - score
+  /aux/coco_relabelled:
+    alternatives:
+    - name: relabel-coco
+      subtasks:
+      - - relabel-coco
+  /aux/synth_set:
+    alternatives:
+    - name: make-synth-set
+      subtasks:
+      - - make-synth-set
+  /aux/part_detector:
+    alternatives:
+    - name: train-part-detector
+      subtasks:
+      - - goal
+        - /aux/coco_relabelled
+      - - goal
+        - /aux/synth_set
+      - - train-part-detector
+  /aux/unit_cube_source:
+    alternatives:
+    - name: unitise
+      subtasks:
+      - - goal
+        - /aux/usd_stage
+      - - unitise-source
+  /aux/scale_sidecar:
+    alternatives:
+    - name: sidecar
+      subtasks:
+      - - goal
+        - /aux/unit_cube_source
+      - - write-scale-sidecar
+  /aux/part_labels:
+    alternatives:
+    - name: segment-labels
+      subtasks:
+      - - goal
+        - /aux/part_detector
+      - - goal
+        - /aux/unit_cube_source
+      - - segment-labels
+  /aux/warp_built:
+    alternatives:
+    - name: build-warp
+      subtasks:
+      - - build-warp
+  /aux/motion_lag:
+    alternatives:
+    - name: measure-lag
+      subtasks:
+      - - goal
+        - /aux/part_labels
+      - - goal
+        - /aux/warp_built
+      - - measure-motion-lag
+  /aux/hair_cards:
+    alternatives:
+    - name: make-hair-cards
+      subtasks:
+      - - make-hair-cards
+  /aux/spring_chains:
+    alternatives:
+    - name: make-spring-chains
+      subtasks:
+      - - goal
+        - /aux/hair_cards
+      - - goal
+        - /aux/scale_sidecar
+      - - make-spring-chains
+  /aux/rigged:
+    alternatives:
+    - name: rig-parts
+      subtasks:
+      - - goal
+        - /aux/labelled_parts
+      - - goal
+        - /aux/soft_rigid_known
+      - - goal
+        - /aux/spring_chains
+      - - rig-aux-parts
+  /aux/labelled_parts:
+    alternatives:
+    - name: label-parts
+      subtasks:
+      - - goal
+        - /aux/metric_labels
+      - - close-labelling
+  /aux/soft_rigid_known:
+    alternatives:
+    - name: decide-soft-or-rigid
+      subtasks:
+      - - goal
+        - /aux/labelled_parts
+      - - goal
+        - /aux/motion_lag
+      - - classify-soft-rigid
+    - name: decide-by-class-prior
+      subtasks:
+      - - goal
+        - /aux/labelled_parts
+      - - classify-by-class-prior
+  /aux/usd_stage:
+    alternatives:
+    - name: ingest
+      subtasks:
+      - - goal
+        - /aux/source_mesh
+      - - ingest-usd
+  /aux/metric_labels:
+    alternatives:
+    - name: restore
+      subtasks:
+      - - goal
+        - /aux/part_labels
+      - - goal
+        - /aux/scale_sidecar
+      - - restore-units
+  /aux/source_mesh:
+    alternatives:
+    - name: dataset
+      subtasks:
+      - - use-dataset-mesh
+    - name: from-image
+      subtasks:
+      - - goal
+        - /aux/matted_image
+      - - pixal3d-image-to-mesh
+  /aux/matted_image:
+    alternatives:
+    - name: matte
+      subtasks:
+      - - matte-image
+  /course/clips_baked:
+    alternatives:
+    - name: bake
+      subtasks:
+      - - bake-clips
+  /course/clips_on_model:
+    alternatives:
+    - name: rig
+      subtasks:
+      - - goal
+        - /course/clips_baked
+      - - rig-clips-on-model
+  /course/shapes_baked:
+    alternatives:
+    - name: bake
+      subtasks:
+      - - bake-course
+  /course/colliders_checked:
+    alternatives:
+    - name: check
+      subtasks:
+      - - goal
+        - /course/shapes_baked
+      - - check-colliders
+  /course/input_ready:
+    alternatives:
+    - name: keyboard or pad
+      subtasks:
+      - - read-keyboard-or-pad
+    - name: VMC capture
+      subtasks:
+      - - read-vmc-capture
+  /course/clip_picked:
+    alternatives:
+    - name: pick
+      subtasks:
+      - - goal
+        - /course/clips_baked
+      - - goal
+        - /course/input_ready
+      - - pick-clip
+  /course/posed:
+    alternatives:
+    - name: play
+      subtasks:
+      - - goal
+        - /course/clips_on_model
+      - - goal
+        - /course/clip_picked
+      - - play-clips
+  /course/grounded:
+    alternatives:
+    - name: hold
+      subtasks:
+      - - goal
+        - /course/colliders_checked
+      - - goal
+        - /course/posed
+      - - hold-at-walls
+  /course/muscle_driven:
+    alternatives:
+    - name: drive
+      subtasks:
+      - - goal
+        - /course/grounded
+      - - drive-muscles
+  /course/avatar_follows:
+    alternatives:
+    - name: follow
+      subtasks:
+      - - goal
+        - /course/muscle_driven
+      - - follow-muscle-skeleton
+  /course/finished:
+    alternatives:
+    - name: finish
+      subtasks:
+      - - goal
+        - /course/avatar_follows
+      - - finish-course
+  /relay/datagrams:
+    alternatives:
+    - name: drain
+      subtasks:
+      - - drain-sockets
+  /relay/person:
+    alternatives:
+    - name: identify
+      subtasks:
+      - - goal
+        - /relay/datagrams
+      - - identify-sender
+  /relay/offered:
+    alternatives:
+    - name: offer
+      subtasks:
+      - - goal
+        - /relay/person
+      - - offer-frame
+  /relay/handled:
+    alternatives:
+    - name: forward
+      subtasks:
+      - - goal
+        - /relay/offered
+      - - send-to-others
+    - name: refuse
+      subtasks:
+      - - goal
+        - /relay/person
+      - - count-refused
+  /relay/ticked:
+    alternatives:
+    - name: tick
+      subtasks:
+      - - goal
+        - /relay/handled
+      - - tick-zones
+  /relay/caught_up:
+    alternatives:
+    - name: catch up
+      subtasks:
+      - - goal
+        - /relay/ticked
+      - - catch-up-if-late
+  /relay/next_tick:
+    alternatives:
+    - name: wait
+      subtasks:
+      - - goal
+        - /relay/caught_up
+      - - wait-for-next-tick
+  /guest/usd:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-usd-guest
+  /guest/udim_unpack:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-udim-unpack-guest
+  /guest/remesh:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-remesh-guest
+  /guest/cage:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-cage-guest
+  /guest/drape:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-drape-guest
+  /guest/cloth_fit:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-cloth-fit-guest
+  /guest/garment_fit:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-garment-fit-guest
+  /guest/headfit:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-headfit-guest
+  /guest/skintokens:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-skintokens-guest
+  /guest/skintokens_rig:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-skintokens-rig-guest
+  /guest/pixal3d:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-pixal3d-guest
+  /guest/seethrough:
+    alternatives:
+    - name: run
+      subtasks:
+      - - run-seethrough-guest
+  /cad/solid_default:
+    alternatives:
+    - name: call
+      subtasks:
+      - - solid-default
+  /cad/solid_box:
+    alternatives:
+    - name: call
+      subtasks:
+      - - solid-box
+  /cad/solid_mesh:
+    alternatives:
+    - name: call
+      subtasks:
+      - - solid-mesh
+  /cad/solid_script:
+    alternatives:
+    - name: call
+      subtasks:
+      - - solid-script
+  /cad/solid_command_count:
+    alternatives:
+    - name: call
+      subtasks:
+      - - solid-command-count
+composed_from:
+- presence-body
+- presence-avatar
+- omnigen2-edit
+- aux-labels
+- aux-motion
+- aux-rig

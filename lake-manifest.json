@@ -1,6 +1,16 @@
 {"version": "1.2.0",
  "packagesDir": ".lake/packages",
- "packages": [],
+ "packages":
+ [{"url": "https://github.com/V-Sekai-fire/lean-yaml-ld",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "9b24c877f873748dc63ba25fd5cc63772ba7ff32",
+   "name": "«lean-yaml-ld»",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "9b24c877f873748dc63ba25fd5cc63772ba7ff32",
+   "inherited": false,
+   "configFile": "lakefile.lean"}],
  "name": "«plan-lottie»",
  "lakeDir": ".lake",
  "fixedToolchain": false}

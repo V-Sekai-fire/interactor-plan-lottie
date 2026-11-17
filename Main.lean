@@ -2,7 +2,7 @@ import PlanLottie
 
 open Lean PlanLottie
 
-/-- `plan_lottie [--grid N] [--transcript out.md] <domain.jsonld> <out.json> <plan.json>...` draws one Sequence node with a part for each plan.
+/-- `plan_lottie [--grid N] [--transcript out.md] <domain.yamlld> <out.json> <plan.yamlld>...` draws one Sequence node with a part for each plan.
 Everything drawn comes from the domain and the plans. `--grid 0` puts nodes where the layout says instead of snapping them.
 Exit 2: usage, 3: a file could not be read or written. -/
 partial def flags (grid : Float) (transcript : Option String) : List String → Float × Option String × List String
@@ -37,4 +37,4 @@ def main (args : List String) : IO UInt32 := do
           match ← writeText tp (PlanLottie.transcript c dom plans) with
           | .error e => IO.eprintln s!"cannot write {e}" *> pure 3
           | .ok _ => IO.println s!"wrote {tp}" *> pure 0
-  | _ => IO.eprintln "usage: plan_lottie [--grid N] [--transcript out.md] <domain.jsonld> <out.json> <plan.json>..." *> pure 2
+  | _ => IO.eprintln "usage: plan_lottie [--grid N] [--transcript out.md] <domain.yamlld> <out.json> <plan.yamlld>..." *> pure 2

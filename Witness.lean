@@ -3,7 +3,7 @@ import PlanLottie
 /-! Checks for the plan-to-Lottie converter. Each check is run on the real output and, where it can fail, on a planted fault that it must catch.
 The converter may hide what the JSON-LD says but may not add to it: the leak checks render from planted domains and require that
 every drawn word either carries a mark put on every string of the JSON-LD, or is one of a short list of words of the drawing language itself.
-usage: plan_lottie_witness <domain.jsonld> <golden transcript.md> <plan.json>... -/
+usage: plan_lottie_witness <domain.yamlld> <golden transcript.md> <plan.yamlld>... -/
 
 open Lean PlanLottie
 
@@ -198,4 +198,4 @@ def main (args : List String) : IO UInt32 := do
         IO.println s!"FAIL: {bad.length} of {checks.length} checks failed"
         pure 1
     | _, _ => IO.eprintln "cannot read an input" *> pure 3
-  | _ => IO.eprintln "usage: plan_lottie_witness <domain.jsonld> <golden transcript.md> <plan.json>..." *> pure 2
+  | _ => IO.eprintln "usage: plan_lottie_witness <domain.yamlld> <golden transcript.md> <plan.yamlld>..." *> pure 2
